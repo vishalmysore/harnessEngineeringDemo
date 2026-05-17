@@ -53,6 +53,8 @@ export const PROVIDERS = [
     keyPlaceholder: 'nvapi-…',
     endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
     models: [
+      { id: 'nvidia/nemotron-nano-12b-v3',            name: 'Nano 12B V3 (recommended)' },
+      { id: 'nvidia/nemotron-nano-12b-v2-vl',         name: 'Nano 12B V2' },
       { id: 'meta/llama-3.1-70b-instruct',            name: 'Llama 3.1 70B Instruct' },
       { id: 'nvidia/llama-3.1-nemotron-70b-instruct', name: 'Nemotron 70B' },
     ],
