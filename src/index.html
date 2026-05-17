@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Harness Engineering Demo — Healthcare Agent</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- ── Configuration Banner ───────────────────────────────────────── -->
+  <header class="config-banner">
+    <div class="banner-left">
+      <div class="app-logo">
+        <span class="logo-icon">⚕</span>
+        <div>
+          <div class="app-title">Healthcare Agent Harness</div>
+          <div class="app-sub">Etna Labs 3-Layer Architecture · Information · Execution · Feedback</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="banner-center">
+      <div class="config-row">
+        <div class="config-field">
+          <label>Provider</label>
+          <select id="provider"></select>
+        </div>
+        <div class="config-field">
+          <label>Model</label>
+          <select id="modelName"></select>
+        </div>
+        <div class="config-field api-field">
+          <label>API Key <span class="key-note">(session only, never stored server-side)</span></label>
+          <input id="apiKey" type="password" placeholder="sk-…" autocomplete="off" />
+        </div>
+        <div class="config-field proxy-field">
+          <label>
+            CORS Proxy
+            <button id="resetProxyBtn" class="btn-inline" title="Reset to default proxy">↺</button>
+          </label>
+          <input id="proxyUrl" type="text" placeholder="https://your-proxy.workers.dev/" />
+        </div>
+      </div>
+    </div>
+
+    <div class="banner-right">
+      <div id="memoryBadge" class="memory-badge">0 corrections in memory</div>
+      <button id="resetMemoryBtn" class="btn btn-reset">↺ Reset Memory</button>
+    </div>
+  </header>
+
+  <!-- ── Main Dashboard ─────────────────────────────────────────────── -->
+  <main class="dashboard">
+
+    <!-- Left Column: Input & Scenarios -->
+    <aside class="col col-left">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-icon">🏥</span>
+          <span>Patient Scenarios</span>
+        </div>
+        <div class="panel-body">
+          <label class="field-label">Select Scenario</label>
+          <select id="scenarioSelect" class="scenario-select">
+            <option value="A">Scenario A — Elderly: BP + Cold Meds</option>
+            <option value="B">Scenario B — Diabetic: Dental Pain</option>
+            <option value="C">Scenario C — Child: Strep + Penicillin Allergy</option>
+            <option value="D">Scenario D — Anticoagulated: Aspirin Request</option>
+          </select>
+
+          <div class="scenario-card">
+            <p id="scenarioDesc" class="scenario-desc"></p>
+            <div id="scenarioTags" class="scenario-tags"></div>
+          </div>
+
+          <button id="executeBtn" class="btn btn-execute">▶ Execute Agent</button>
+
+          <div class="mock-tip">
+            💡 No API key? Select <strong>🧪 Mock AI</strong> to test with real tools &amp; guardrails — no network calls.
+          </div>
+        </div>
+      </div>
+
+      <div class="panel panel-layers">
+        <div class="panel-header">
+          <span class="panel-icon">🏗</span>
+          <span>Harness Architecture</span>
+        </div>
+        <div class="panel-body">
+          <div class="layer-badge layer-info">
+            <strong>Layer 1 · Information</strong>
+            <p>Memory retrieval · Tool schemas · Context assembly</p>
+          </div>
+          <div class="layer-badge layer-exec">
+            <strong>Layer 2 · Execution</strong>
+            <p>Agentic loop · Tool calls · Guardrails · Retry logic</p>
+          </div>
+          <div class="layer-badge layer-feedback">
+            <strong>Layer 3 · Feedback</strong>
+            <p>Schema verification · HITL capture · Memory updates</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center Column: Live Harness Trace -->
+    <section class="col col-center">
+      <div class="panel panel-trace">
+        <div class="panel-header">
+          <span class="panel-icon">📡</span>
+          <span>Live Harness Trace</span>
+          <span class="trace-live-dot"></span>
+        </div>
+        <div id="traceContainer" class="trace-container">
+          <div class="trace-empty">
+            <div class="trace-empty-icon">⟳</div>
+            <p>Select a scenario and click <strong>Execute Agent</strong> to watch the harness in action.</p>
+            <p class="trace-empty-sub">Events stream here in real time, color-coded by layer.</p>
+            <p class="trace-empty-sub">Use <strong>Mock AI</strong> to demo without an API key.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Clinician Desk -->
+    <section class="col col-right">
+      <div class="panel panel-clinician">
+        <div class="panel-header">
+          <span class="panel-icon">👩‍⚕️</span>
+          <span>Clinician Review Desk</span>
+        </div>
+        <div id="clinicianPanel" class="clinician-body">
+          <div class="waiting-msg">
+            <div class="waiting-icon">⚕</div>
+            <p>Care plan will appear here after agent analysis completes.</p>
+            <p class="waiting-sub">Human-in-the-loop review before any recommendation is finalized.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
