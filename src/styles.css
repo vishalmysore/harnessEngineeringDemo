@@ -535,6 +535,29 @@ html, body {
 
 .correction-box textarea:focus { border-color: var(--warn); }
 
+.config-field.test-field { flex: 0 0 auto; }
+
+.btn-test {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  height: 30px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+.btn-test:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
+.test-result {
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  margin-top: 4px;
+  width: 100%;
+}
+.test-result.hidden       { display: none; }
+.test-result-ok   { background: rgba(63,185,80,0.1);  border: 1px solid rgba(63,185,80,0.3);  color: var(--feedback); }
+.test-result-fail { background: rgba(248,81,73,0.1);  border: 1px solid rgba(248,81,73,0.3);  color: var(--danger); }
+
 .mock-tip {
   font-size: 11px;
   color: var(--text-muted);

@@ -1,7 +1,7 @@
 import { runAgent } from './execution/orchestrator.js'
 import { saveCorrection, clearAllMemories, getAllMemories } from './information/memoryManager.js'
 import tracer from './feedback/tracer.js'
-import { PROVIDERS, setLLMConfig, getLLMConfig, getDefaultProxy } from './utils/llm.js'
+import { PROVIDERS, setLLMConfig, getLLMConfig, getDefaultProxy, testConnection } from './utils/llm.js'
 
 const SCENARIOS = {
   A: {
@@ -230,6 +230,40 @@ function updateScenarioInfo() {
   document.getElementById('scenarioTags').textContent = `Tags: ${scenario.tags.join(' · ')}`
 }
 
+// ── Test Connection ────────────────────────────────────────────
+
+async function handleTestConnection() {
+  syncConfigFromUI()
+  const cfg = getLLMConfig()
+  const resultEl = document.getElementById('testResult')
+  const testBtn  = document.getElementById('testBtn')
+
+  if (cfg.provider !== 'mock' && !cfg.apiKey) {
+    showTestResult('fail', '❌ Enter an API key first.')
+    return
+  }
+
+  testBtn.disabled = true
+  testBtn.textContent = '⟳ Testing…'
+  resultEl.className = 'test-result hidden'
+
+  try {
+    const { text, latencyMs } = await testConnection()
+    showTestResult('ok', `✅ Connected! Response: "${text.slice(0, 40)}" (${latencyMs}ms)`)
+  } catch (err) {
+    showTestResult('fail', `❌ ${err.message}`)
+  } finally {
+    testBtn.disabled = false
+    testBtn.textContent = '🧪 Test'
+  }
+}
+
+function showTestResult(status, message) {
+  const el = document.getElementById('testResult')
+  el.textContent = message
+  el.className = `test-result test-result-${status}`
+}
+
 // ── Execute ────────────────────────────────────────────────────
 
 async function executeAgent() {
@@ -298,6 +332,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('scenarioSelect').addEventListener('change', updateScenarioInfo)
   document.getElementById('executeBtn').addEventListener('click', executeAgent)
+
+  document.getElementById('testBtn').addEventListener('click', handleTestConnection)
 
   document.getElementById('resetMemoryBtn').addEventListener('click', () => {
     if (confirm('Clear all saved clinician corrections from local memory?')) {

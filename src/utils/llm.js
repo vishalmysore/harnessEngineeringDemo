@@ -236,3 +236,77 @@ export function appendCorrectionMessage(messages, rawAssistantMessage, correctio
 export function isMockMode() {
   return getLLMConfig().provider === 'mock'
 }
+
+/**
+ * testConnection — send a minimal "Say OK" prompt to verify the API key and proxy work.
+ * @returns {Promise<{ text: string, latencyMs: number }>}
+ */
+export async function testConnection() {
+  const { provider, apiKey, model, proxyUrl } = getLLMConfig()
+  const providerDef = getProviderDef(provider)
+  if (!providerDef) throw new Error(`Unknown provider: ${provider}`)
+
+  if (provider === 'mock') {
+    await new Promise(r => setTimeout(r, 600))
+    return { text: 'OK (mock)', latencyMs: 600 }
+  }
+
+  if (!apiKey) throw new Error('No API key configured.')
+
+  const proxy = proxyUrl || DEFAULT_PROXY
+  const start = Date.now()
+
+  if (providerDef.format === 'anthropic') {
+    const res = await fetch(proxy, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-target-url': providerDef.endpoint,
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'Say OK' }],
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data?.error?.message || `Anthropic error ${res.status}`)
+    return { text: data.content?.[0]?.text || 'OK', latencyMs: Date.now() - start }
+  }
+
+  // OpenAI-compatible (OpenAI, NVIDIA NIM, Gemini)
+  let targetUrl = providerDef.endpoint
+  if (provider === 'nvidia' && !targetUrl.endsWith('/chat/completions')) {
+    targetUrl += '/chat/completions'
+  }
+  if (provider === 'gemini') {
+    targetUrl = `${providerDef.endpoint}/v1beta/models/${model}:generateContent?key=${apiKey}`
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-target-url': targetUrl,
+  }
+  if (provider !== 'gemini') headers['Authorization'] = `Bearer ${apiKey}`
+
+  let body
+  if (provider === 'gemini') {
+    body = { contents: [{ parts: [{ text: 'Say OK' }] }], generationConfig: { maxOutputTokens: 10 } }
+  } else {
+    body = { model, max_tokens: 10, messages: [{ role: 'user', content: 'Say OK' }] }
+  }
+
+  const res = await fetch(proxy, { method: 'POST', headers, body: JSON.stringify(body) })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data?.error?.message || `${providerDef.name} error ${res.status}`)
+
+  let text = ''
+  if (provider === 'gemini') {
+    text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'OK'
+  } else {
+    text = data.choices?.[0]?.message?.content || 'OK'
+  }
+  return { text: text.trim(), latencyMs: Date.now() - start }
+}
