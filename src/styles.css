@@ -2,23 +2,24 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:          #0d1117;
-  --surface:     #161b22;
-  --surface2:    #21262d;
-  --border:      #30363d;
-  --text:        #e6edf3;
-  --text-muted:  #8b949e;
-  --accent:      #58a6ff;
-  --info:        #58a6ff;
-  --exec:        #bc8cff;
-  --feedback:    #3fb950;
-  --warn:        #d29922;
-  --danger:      #f85149;
-  --critical:    #ff4040;
-  --allergy:     #ff6b35;
-  --header-h:    64px;
-  --font-mono:   'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-  --font-ui:     'Segoe UI', system-ui, -apple-system, sans-serif;
+  --bg:           #0d1117;
+  --surface:      #161b22;
+  --surface2:     #21262d;
+  --border:       #30363d;
+  --text:         #e6edf3;
+  --text-muted:   #8b949e;
+  --accent:       #58a6ff;
+  --info:         #58a6ff;
+  --exec:         #bc8cff;
+  --feedback:     #3fb950;
+  --warn:         #d29922;
+  --danger:       #f85149;
+  --critical:     #ff4040;
+  --allergy:      #ff6b35;
+  --domain-color: #58a6ff;
+  --header-h:     64px;
+  --font-mono:    'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  --font-ui:      'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 html, body {
@@ -557,6 +558,48 @@ html, body {
 .test-result.hidden       { display: none; }
 .test-result-ok   { background: rgba(63,185,80,0.1);  border: 1px solid rgba(63,185,80,0.3);  color: var(--feedback); }
 .test-result-fail { background: rgba(248,81,73,0.1);  border: 1px solid rgba(248,81,73,0.3);  color: var(--danger); }
+
+/* ── Domain selector ──────────────────────────────────────────── */
+.domain-select {
+  font-weight: 600;
+  border-color: var(--domain-color);
+  color: var(--domain-color);
+}
+
+.domain-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+  border-left: 2px solid var(--domain-color);
+  padding-left: 8px;
+}
+
+/* ── Recommendation cards ─────────────────────────────────────── */
+.rec-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--domain-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rec-card strong { font-size: 13px; color: var(--domain-color); }
+.rec-detail      { font-size: 12px; color: var(--text-muted); }
+
+.rec-high   { border-left-color: var(--danger); }
+.rec-high strong { color: var(--danger); }
+.rec-medium { border-left-color: var(--warn); }
+.rec-medium strong { color: var(--warn); }
+.rec-low    { border-left-color: var(--text-muted); }
+.rec-low strong { color: var(--text-muted); }
+
+/* ── Execute button uses domain color ─────────────────────────── */
+.btn-execute { background: var(--domain-color); }
 
 .mock-tip {
   font-size: 11px;

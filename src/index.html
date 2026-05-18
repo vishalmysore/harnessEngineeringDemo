@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Harness Engineering Demo — Healthcare Agent</title>
+  <title>Harness Engineering Demo</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <!-- ── Configuration Banner ───────────────────────────────────────── -->
+  <!-- ── Config Banner ──────────────────────────────────────────── -->
   <header class="config-banner">
     <div class="banner-left">
       <div class="app-logo">
-        <span class="logo-icon">⚕</span>
+        <span class="logo-icon">⚙</span>
         <div>
-          <div class="app-title">Healthcare Agent Harness</div>
+          <div class="app-title">Harness Engineering Demo</div>
           <div class="app-sub">Etna Labs 3-Layer Architecture · Information · Execution · Feedback</div>
         </div>
       </div>
@@ -30,14 +30,11 @@
           <select id="modelName"></select>
         </div>
         <div class="config-field api-field">
-          <label>API Key <span class="key-note">(session only, never stored server-side)</span></label>
+          <label>API Key <span class="key-note">(session only)</span></label>
           <input id="apiKey" type="password" placeholder="sk-…" autocomplete="off" />
         </div>
         <div class="config-field proxy-field">
-          <label>
-            CORS Proxy
-            <button id="resetProxyBtn" class="btn-inline" title="Reset to default proxy">↺</button>
-          </label>
+          <label>CORS Proxy <button id="resetProxyBtn" class="btn-inline" title="Reset to default">↺</button></label>
           <input id="proxyUrl" type="text" placeholder="https://your-proxy.workers.dev/" />
         </div>
         <div class="config-field test-field">
@@ -54,72 +51,55 @@
     </div>
   </header>
 
-  <!-- ── Main Dashboard ─────────────────────────────────────────────── -->
+  <!-- ── Dashboard ─────────────────────────────────────────────── -->
   <main class="dashboard">
 
-    <!-- Left Column: Input & Scenarios -->
+    <!-- Left: Domain + Scenario selection -->
     <aside class="col col-left">
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-icon">🏥</span>
-          <span>Patient Scenarios</span>
+          <span class="panel-icon">🌐</span>
+          <span>Domain &amp; Scenario</span>
         </div>
         <div class="panel-body">
-          <label class="field-label">Select Scenario</label>
-          <select id="scenarioSelect" class="scenario-select">
-            <option value="A">Scenario A — Elderly: BP + Cold Meds</option>
-            <option value="B">Scenario B — Diabetic: Dental Pain</option>
-            <option value="C">Scenario C — Child: Strep + Penicillin Allergy</option>
-            <option value="D">Scenario D — Anticoagulated: Aspirin Request</option>
-          </select>
 
+          <label class="field-label">Domain</label>
+          <select id="domainSelect" class="scenario-select domain-select"></select>
+          <p id="domainDesc" class="domain-desc"></p>
+
+          <label class="field-label" style="margin-top:12px">Scenario</label>
+          <select id="scenarioSelect" class="scenario-select"></select>
           <div class="scenario-card">
             <p id="scenarioDesc" class="scenario-desc"></p>
             <div id="scenarioTags" class="scenario-tags"></div>
           </div>
 
           <button id="executeBtn" class="btn btn-execute">▶ Execute Agent</button>
-
-          <div class="mock-tip">
-            💡 No API key? Select <strong>🧪 Mock AI</strong> to test with real tools &amp; guardrails — no network calls.
-          </div>
+          <div class="mock-tip">💡 No API key? Select <strong>🧪 Mock AI</strong> — runs real tools &amp; guardrails without any network calls.</div>
         </div>
       </div>
 
       <div class="panel panel-layers">
-        <div class="panel-header">
-          <span class="panel-icon">🏗</span>
-          <span>Harness Architecture</span>
-        </div>
+        <div class="panel-header"><span class="panel-icon">🏗</span><span>Harness Architecture</span></div>
         <div class="panel-body">
-          <div class="layer-badge layer-info">
-            <strong>Layer 1 · Information</strong>
-            <p>Memory retrieval · Tool schemas · Context assembly</p>
-          </div>
-          <div class="layer-badge layer-exec">
-            <strong>Layer 2 · Execution</strong>
-            <p>Agentic loop · Tool calls · Guardrails · Retry logic</p>
-          </div>
-          <div class="layer-badge layer-feedback">
-            <strong>Layer 3 · Feedback</strong>
-            <p>Schema verification · HITL capture · Memory updates</p>
-          </div>
+          <div class="layer-badge layer-info"><strong>Layer 1 · Information</strong><p>Memory retrieval · Tool schemas · Context assembly</p></div>
+          <div class="layer-badge layer-exec"><strong>Layer 2 · Execution</strong><p>Agentic loop · Tool calls · Guardrails · Retry logic</p></div>
+          <div class="layer-badge layer-feedback"><strong>Layer 3 · Feedback</strong><p>Schema verification · HITL capture · Memory updates</p></div>
         </div>
       </div>
     </aside>
 
-    <!-- Center Column: Live Harness Trace -->
+    <!-- Center: Live trace -->
     <section class="col col-center">
       <div class="panel panel-trace">
         <div class="panel-header">
-          <span class="panel-icon">📡</span>
-          <span>Live Harness Trace</span>
+          <span class="panel-icon">📡</span><span>Live Harness Trace</span>
           <span class="trace-live-dot"></span>
         </div>
         <div id="traceContainer" class="trace-container">
           <div class="trace-empty">
             <div class="trace-empty-icon">⟳</div>
-            <p>Select a scenario and click <strong>Execute Agent</strong> to watch the harness in action.</p>
+            <p>Select a domain &amp; scenario, then click <strong>Execute Agent</strong>.</p>
             <p class="trace-empty-sub">Events stream here in real time, color-coded by layer.</p>
             <p class="trace-empty-sub">Use <strong>Mock AI</strong> to demo without an API key.</p>
           </div>
@@ -127,18 +107,18 @@
       </div>
     </section>
 
-    <!-- Right Column: Clinician Desk -->
+    <!-- Right: Review desk -->
     <section class="col col-right">
       <div class="panel panel-clinician">
         <div class="panel-header">
-          <span class="panel-icon">👩‍⚕️</span>
-          <span>Clinician Review Desk</span>
+          <span class="panel-icon">👤</span>
+          <span id="reviewerLabel">Review Desk</span>
         </div>
         <div id="clinicianPanel" class="clinician-body">
           <div class="waiting-msg">
-            <div class="waiting-icon">⚕</div>
-            <p>Care plan will appear here after agent analysis completes.</p>
-            <p class="waiting-sub">Human-in-the-loop review before any recommendation is finalized.</p>
+            <div class="waiting-icon">⚑</div>
+            <p>Output will appear here after agent analysis completes.</p>
+            <p class="waiting-sub">Human-in-the-loop review before any recommendation is finalised.</p>
           </div>
         </div>
       </div>
