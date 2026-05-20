@@ -70,7 +70,42 @@ export const PROVIDERS = [
     ],
     format: 'mock',
   },
+  {
+    id: 'webllm',
+    name: 'Local WebLLM (WebGPU)',
+    icon: '💻',
+    keyPlaceholder: 'No key needed',
+    endpoint: 'local',
+    models: [
+      { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', name: 'Llama-3.2-1B (Fast Download)' },
+      { id: 'Llama-3.1-8B-Instruct-q4f32_1-MLC', name: 'Llama-3.1-8B (4-bit)' },
+      { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC', name: 'Phi-3.5-mini (4-bit)' },
+    ],
+    format: 'openai',
+  },
 ]
+
+let _webllmEngine = null;
+
+export async function loadWebLLMEngine(model, progressCallback) {
+  const { CreateMLCEngine, prebuiltAppConfig } = await import('@mlc-ai/web-llm');
+  
+  const appConfig = {
+    ...prebuiltAppConfig,
+    cacheBackend: "opfs" // Use Origin Private File System instead of standard Cache API
+  };
+
+  // Initialize the engine with the provided model
+  _webllmEngine = await CreateMLCEngine(model, { 
+    initProgressCallback: progressCallback,
+    appConfig: appConfig
+  });
+  return _webllmEngine;
+}
+
+export function getWebLLMEngine() {
+  return _webllmEngine;
+}
 
 let _config = {
   provider: 'openai',
@@ -113,9 +148,20 @@ export async function callLLMWithTools(messages, systemPrompt, toolSchemasOpenAI
   const { provider, apiKey, model, proxyUrl } = getLLMConfig()
   const providerDef = getProviderDef(provider)
   if (!providerDef) throw new Error(`Unknown provider: ${provider}`)
-  if (provider !== 'mock' && !apiKey) throw new Error('API key not configured. Open Settings to add one.')
+  if (provider !== 'mock' && provider !== 'webllm' && !apiKey) throw new Error('API key not configured. Open Settings to add one.')
 
   const proxy = proxyUrl || DEFAULT_PROXY
+
+  if (provider === 'webllm') {
+    if (!_webllmEngine) throw new Error('WebLLM engine not loaded. Please wait for model download.');
+    const response = await _webllmEngine.chat.completions.create({
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      temperature: 0.2,
+      tools: toolSchemasOpenAI,
+      tool_choice: 'auto',
+    });
+    return response;
+  }
 
   if (providerDef.format === 'anthropic') {
     return _callAnthropic(messages, systemPrompt, model, apiKey, proxy, toolSchemasAnthropic)
@@ -179,11 +225,17 @@ export function extractToolCalls(response) {
   // OpenAI format
   const toolCalls = response.choices?.[0]?.message?.tool_calls
   if (!toolCalls?.length) return null
-  return toolCalls.map(tc => ({
-    id: tc.id,
-    name: tc.function.name,
-    args: JSON.parse(tc.function.arguments),
-  }))
+  return toolCalls.map(tc => {
+    let parsedArgs = tc.function.arguments;
+    if (typeof parsedArgs === 'string') {
+      try { parsedArgs = JSON.parse(parsedArgs); } catch (e) { parsedArgs = {}; }
+    }
+    return {
+      id: tc.id,
+      name: tc.function.name,
+      args: parsedArgs,
+    }
+  })
 }
 
 export function extractText(response) {
@@ -250,6 +302,16 @@ export async function testConnection() {
   if (provider === 'mock') {
     await new Promise(r => setTimeout(r, 600))
     return { text: 'OK (mock)', latencyMs: 600 }
+  }
+
+  if (provider === 'webllm') {
+    if (!_webllmEngine) throw new Error('WebLLM Engine not loaded. Click Execute to load it first.');
+    const start = Date.now();
+    const res = await _webllmEngine.chat.completions.create({
+      messages: [{ role: 'user', content: 'Say OK' }],
+      max_tokens: 10
+    });
+    return { text: res.choices[0].message.content, latencyMs: Date.now() - start };
   }
 
   if (!apiKey) throw new Error('No API key configured.')

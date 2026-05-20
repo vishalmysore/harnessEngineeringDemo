@@ -75,7 +75,10 @@
           </div>
 
           <button id="executeBtn" class="btn btn-execute">▶ Execute Agent</button>
-          <div class="mock-tip">💡 No API key? Select <strong>🧪 Mock AI</strong> — runs real tools &amp; guardrails without any network calls.</div>
+          <div id="webllmProgressContainer" class="hidden" style="margin-top: 10px; font-size: 0.9em; color: var(--domain-color); background: rgba(0,0,0,0.05); padding: 10px; border-radius: 6px;">
+            <strong>WebLLM Initializing:</strong> <span id="webllmProgressText">Loading engine...</span>
+          </div>
+          <div class="mock-tip">💡 No API key? Select <strong>🧪 Mock AI</strong> or <strong>💻 WebLLM</strong> to demo without an API key.</div>
         </div>
       </div>
 
