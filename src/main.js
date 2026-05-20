@@ -29,7 +29,7 @@ function populateProviderModels(providerId) {
     const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; sel.appendChild(o)
   })
   document.getElementById('apiKey').placeholder = prov?.keyPlaceholder || 'API key'
-  const noKey = providerId === 'mock'
+  const noKey = providerId === 'mock' || providerId === 'webllm'
   document.getElementById('apiKey').disabled      = noKey
   document.getElementById('apiKey').style.opacity = noKey ? '0.4' : '1'
 }
@@ -200,7 +200,7 @@ async function handleTestConnection() {
   syncConfigFromUI()
   const cfg = getLLMConfig()
   const btn = document.getElementById('testBtn')
-  if (cfg.provider !== 'mock' && !cfg.apiKey) { showTestResult('fail','❌ Enter an API key first.'); return }
+  if (cfg.provider !== 'mock' && cfg.provider !== 'webllm' && !cfg.apiKey) { showTestResult('fail','❌ Enter an API key first.'); return }
   btn.disabled = true; btn.textContent = '⟳ Testing…'
   document.getElementById('testResult').className = 'test-result hidden'
   try {
@@ -225,7 +225,7 @@ async function executeAgent() {
   if (agentRunning) return
   syncConfigFromUI()
   const cfg = getLLMConfig()
-  if (cfg.provider !== 'mock' && !cfg.apiKey) { alert('Please enter your API key, or switch to Mock AI to test without one.'); return }
+  if (cfg.provider !== 'mock' && cfg.provider !== 'webllm' && !cfg.apiKey) { alert('Please enter your API key, or switch to Mock AI / WebLLM to test without one.'); return }
 
   const domain   = getActiveDomain()
   const scenario = domain.scenarios[document.getElementById('scenarioSelect').value]
@@ -241,6 +241,31 @@ async function executeAgent() {
 
   if (traceUnsub) traceUnsub()
   traceUnsub = tracer.subscribe('*', (event, data) => appendTrace(event, data))
+
+  if (cfg.provider === 'webllm') {
+    const { loadWebLLMEngine, getWebLLMEngine } = await import('./utils/llm.js')
+    if (!getWebLLMEngine()) {
+      document.getElementById('webllmProgressContainer').classList.remove('hidden')
+      document.getElementById('executeBtn').textContent = 'Downloading Model...'
+      appendTrace('layer:info', 'Loading WebLLM Model (this may take a while to download to cache)...')
+      try {
+        await loadWebLLMEngine(cfg.model, (initProgress) => {
+          document.getElementById('webllmProgressText').textContent = initProgress.text
+        });
+        document.getElementById('webllmProgressContainer').classList.add('hidden')
+        appendTrace('layer:info', 'WebLLM Model loaded successfully to WebGPU!')
+        document.getElementById('executeBtn').textContent = '⟳ Running…'
+      } catch (err) {
+        console.error("WebLLM Error Details:", err);
+        document.getElementById('webllmProgressContainer').classList.add('hidden')
+        appendTrace('agent:error', `Failed to load WebLLM: ${err.message}`)
+        agentRunning = false;
+        document.getElementById('executeBtn').disabled = false;
+        document.getElementById('executeBtn').textContent = '▶ Execute Agent';
+        return;
+      }
+    }
+  }
 
   try {
     const result  = await runAgent(scenario, domain)
