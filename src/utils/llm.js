@@ -1,313 +1,188 @@
 /**
- * llm.js — LLM API wrapper with proxy routing and tool-call support.
- * All requests are routed through a CORS proxy via x-target-url header.
- * Supported providers: OpenAI, Anthropic, Google Gemini, NVIDIA NIM, Mock.
+ * llm.js — WebLLM wrapper with prompt-based tool calling.
+ * Runs entirely in the browser via WebGPU — no API keys required.
  */
 
-const DEFAULT_PROXY = 'https://quantumstudio.visrow.workers.dev/'
-
-export const PROVIDERS = [
-  {
-    id: 'openai',
-    name: 'OpenAI',
-    icon: '🤖',
-    keyPlaceholder: 'sk-…',
-    endpoint: 'https://api.openai.com/v1/chat/completions',
-    models: [
-      { id: 'gpt-4o',      name: 'GPT-4o (recommended)' },
-      { id: 'gpt-4o-mini', name: 'GPT-4o Mini (fast)' },
-      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
-    ],
-    format: 'openai',
-  },
-  {
-    id: 'anthropic',
-    name: 'Anthropic',
-    icon: '🧬',
-    keyPlaceholder: 'sk-ant-…',
-    endpoint: 'https://api.anthropic.com/v1/messages',
-    models: [
-      { id: 'claude-opus-4-7',              name: 'Claude Opus 4.7 (most capable)' },
-      { id: 'claude-sonnet-4-6',            name: 'Claude Sonnet 4.6 (recommended)' },
-      { id: 'claude-3-5-sonnet-20241022',   name: 'Claude 3.5 Sonnet' },
-    ],
-    format: 'anthropic',
-  },
-  {
-    id: 'gemini',
-    name: 'Google Gemini',
-    icon: '✨',
-    keyPlaceholder: 'AIza…',
-    endpoint: 'https://generativelanguage.googleapis.com',
-    models: [
-      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (recommended)' },
-      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-      { id: 'gemini-1.5-pro',   name: 'Gemini 1.5 Pro' },
-    ],
-    format: 'openai',
-  },
-  {
-    id: 'nvidia',
-    name: 'NVIDIA NIM',
-    icon: '🟢',
-    keyPlaceholder: 'nvapi-…',
-    endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
-    models: [
-      { id: 'nvidia/nemotron-nano-12b-v2-vl',         name: 'Nano 12B V2 (recommended)' },
-      { id: 'meta/llama-3.1-70b-instruct',            name: 'Llama 3.1 70B Instruct' },
-      { id: 'nvidia/llama-3.1-nemotron-70b-instruct', name: 'Llama 3.1 Nemotron 70B' },
-    ],
-    format: 'openai',
-  },
-  {
-    id: 'mock',
-    name: 'Mock AI',
-    icon: '🧪',
-    keyPlaceholder: 'No key needed',
-    endpoint: 'mock',
-    models: [
-      { id: 'mock-agent', name: 'Mock Agent v1 (no API key required)' },
-    ],
-    format: 'mock',
-  },
+export const WEBLLM_MODELS = [
+  { id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC',  name: 'Llama 3.2 3B (~2.0 GB) — Recommended' },
+  { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC',   name: 'Phi-3.5 Mini (~2.2 GB)' },
+  { id: 'Qwen2.5-3B-Instruct-q4f16_1-MLC',     name: 'Qwen 2.5 3B (~2.0 GB)' },
+  { id: 'gemma-2-2b-it-q4f16_1-MLC',           name: 'Gemma 2 2B (~1.5 GB)' },
+  { id: 'Llama-3.2-1B-Instruct-q4f32_1-MLC',   name: 'Llama 3.2 1B (~0.9 GB) — Fast' },
 ]
 
-let _config = {
-  provider: 'openai',
-  apiKey: '',
-  model: 'gpt-4o',
-  proxyUrl: _loadProxyUrl(),
+let _worker      = null
+let _status      = 'idle' // 'idle' | 'loading' | 'ready' | 'error'
+let _modelId     = null
+let _genCounter  = 0
+let _onProgress  = null
+let _pendingLoad = null
+let _pendingGen  = null
+
+function _ensureWorker() {
+  if (_worker) return
+  _worker = new Worker(new URL('../worker.js', import.meta.url), { type: 'module' })
+  _worker.onmessage = _handleMessage
 }
 
-function _loadProxyUrl() {
-  try { return localStorage.getItem('hh_proxy_url') || DEFAULT_PROXY } catch { return DEFAULT_PROXY }
-}
-
-export function setLLMConfig(cfg) {
-  _config = { ..._config, ...cfg }
-  if (cfg.proxyUrl !== undefined) {
-    try { localStorage.setItem('hh_proxy_url', cfg.proxyUrl || DEFAULT_PROXY) } catch { /* ignore */ }
+function _handleMessage(e) {
+  const msg = e.data
+  switch (msg.status) {
+    case 'ready':
+      _status  = 'ready'
+      _modelId = msg.modelId
+      _onProgress?.({ type: 'ready', modelId: msg.modelId })
+      _pendingLoad?.resolve()
+      _pendingLoad = null
+      break
+    case 'error': {
+      _status = 'error'
+      const err = new Error(msg.error)
+      _pendingLoad?.reject(err)
+      _pendingGen?.reject(err)
+      _pendingLoad = null
+      _pendingGen  = null
+      break
+    }
+    case 'downloading':
+      _onProgress?.({ type: 'downloading', progress: msg.progress, file: msg.file })
+      break
+    case 'phase':
+      _onProgress?.({ type: 'phase', phase: msg.phase, note: msg.note })
+      break
+    case 'device_detected':
+      _onProgress?.({ type: 'device' })
+      break
+    case 'success':
+      _pendingGen?.resolve({ text: msg.generatedText, latencyMs: msg.elapsedMs, tokensPerSec: msg.tokensPerSec })
+      _pendingGen = null
+      break
+    case 'cancelled':
+    case 'disposed':
+      _pendingLoad?.reject(new Error('Cancelled'))
+      _pendingLoad = null
+      break
   }
 }
 
-export function getLLMConfig() {
-  return { ..._config, proxyUrl: _config.proxyUrl || DEFAULT_PROXY }
+export function getModelStatus()    { return _status }
+export function getLoadedModelId()  { return _modelId }
+
+export function loadModel(modelId, onProgress) {
+  _ensureWorker()
+  _status     = 'loading'
+  _modelId    = null
+  _onProgress = onProgress
+  _genCounter++
+
+  return new Promise((resolve, reject) => {
+    _pendingLoad = { resolve, reject }
+    _worker.postMessage({ action: 'load', modelId, gen: _genCounter })
+  })
 }
 
-export function getDefaultProxy() { return DEFAULT_PROXY }
-
-export function getProviderDef(providerId) {
-  return PROVIDERS.find(p => p.id === (providerId || _config.provider))
+export function cancelModel() {
+  if (_worker) _worker.postMessage({ action: 'cancel' })
+  _status      = 'idle'
+  _pendingLoad = null
+  _pendingGen  = null
 }
 
-/**
- * Call the LLM with tool definitions. Returns the raw provider response.
- * Handles OpenAI-format (tool_calls) and Anthropic-format (content blocks).
- * @param {{ role, content }[]} messages
- * @param {string} systemPrompt
- * @param {object[]} toolSchemasOpenAI
- * @param {object[]} toolSchemasAnthropic
- * @returns {Promise<object>} Raw provider response
- */
-export async function callLLMWithTools(messages, systemPrompt, toolSchemasOpenAI, toolSchemasAnthropic) {
-  const { provider, apiKey, model, proxyUrl } = getLLMConfig()
-  const providerDef = getProviderDef(provider)
-  if (!providerDef) throw new Error(`Unknown provider: ${provider}`)
-  if (provider !== 'mock' && !apiKey) throw new Error('API key not configured. Open Settings to add one.')
+// ── Mock mode support ──────────────────────────────────────────
 
-  const proxy = proxyUrl || DEFAULT_PROXY
+let _mockMode = false
+export function setMockMode(v) { _mockMode = v }
+export function isMockMode()   { return _mockMode }
 
-  if (providerDef.format === 'anthropic') {
-    return _callAnthropic(messages, systemPrompt, model, apiKey, proxy, toolSchemasAnthropic)
-  }
-  return _callOpenAIFormat(messages, systemPrompt, model, apiKey, proxy, toolSchemasOpenAI, providerDef)
+// ── Prompt-based tool calling ──────────────────────────────────
+
+function _buildToolPromptSuffix(toolSchemas) {
+  if (!toolSchemas?.length) return ''
+  const defs = toolSchemas.map(t => ({
+    name:        t.function.name,
+    description: t.function.description,
+    parameters:  t.function.parameters,
+  }))
+  return `
+
+## Tool Use Instructions
+To call a tool, output ONLY a JSON block wrapped in <tool_call> tags — nothing else on that turn:
+<tool_call>
+{"tool_calls": [{"id": "c1", "name": "TOOL_NAME", "args": {}}]}
+</tool_call>
+
+You may batch multiple calls in one array. After receiving results, continue reasoning.
+When finished, output your final answer as plain JSON (no tool_call tags).
+
+Available tools:
+${JSON.stringify(defs, null, 2)}`
 }
 
-// ── Provider implementations ───────────────────────────────────
-
-async function _callOpenAIFormat(messages, systemPrompt, model, apiKey, proxy, tools, providerDef) {
-  const targetUrl = providerDef.id === 'gemini'
-    ? `${providerDef.endpoint}/v1beta/models/${model}:generateContent?key=${apiKey}`
-    : providerDef.endpoint
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'x-target-url': targetUrl,
-  }
-  if (providerDef.id !== 'gemini') {
-    headers['Authorization'] = `Bearer ${apiKey}`
-  }
-
-  const body = {
-    model,
-    temperature: 0.2,
-    messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    tools,
-    tool_choice: 'auto',
-  }
-
-  const res = await fetch(proxy, { method: 'POST', headers, body: JSON.stringify(body) })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data?.error?.message || `${providerDef.name} error ${res.status}`)
-  return data
+function _parseToolCalls(text) {
+  const match = text.match(/<tool_call>([\s\S]*?)<\/tool_call>/)
+  if (!match) return null
+  try {
+    const parsed = JSON.parse(match[1].trim())
+    if (Array.isArray(parsed.tool_calls)) {
+      return parsed.tool_calls.map((tc, i) => ({
+        id:   tc.id   || `call_${i}`,
+        name: tc.name,
+        args: tc.args || {},
+      }))
+    }
+  } catch (_) { /* malformed JSON — treat as no tool calls */ }
+  return null
 }
 
-async function _callAnthropic(messages, systemPrompt, model, apiKey, proxy, tools) {
-  const headers = {
-    'Content-Type': 'application/json',
-    'x-target-url': 'https://api.anthropic.com/v1/messages',
-    'x-api-key': apiKey,
-    'anthropic-version': '2023-06-01',
-  }
-  const body = { model, system: systemPrompt, messages, tools, max_tokens: 4096, temperature: 0.2 }
+// ── Public API (mirrors old cloud llm.js surface) ──────────────
 
-  const res = await fetch(proxy, { method: 'POST', headers, body: JSON.stringify(body) })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data?.error?.message || `Anthropic error ${res.status}`)
-  return data
+export async function callLLMWithTools(messages, systemPrompt, toolSchemasOpenAI /*, _anthropic unused */) {
+  if (_status !== 'ready') throw new Error('No model loaded. Use the model loader to load a model first.')
+
+  const fullSystemPrompt = systemPrompt + _buildToolPromptSuffix(toolSchemasOpenAI)
+  _genCounter++
+  const gen = _genCounter
+
+  return new Promise((resolve, reject) => {
+    _pendingGen = {
+      resolve: ({ text, latencyMs, tokensPerSec }) =>
+        resolve({ _webllm: true, text, latencyMs, tokensPerSec }),
+      reject,
+    }
+    _worker.postMessage({ action: 'generate', messages, systemPrompt: fullSystemPrompt, gen })
+  })
 }
-
-// ── Response extraction helpers ────────────────────────────────
 
 export function extractToolCalls(response) {
-  const { provider } = getLLMConfig()
-  if (provider === 'anthropic') {
-    const blocks = response.content?.filter(b => b.type === 'tool_use') || []
-    if (!blocks.length) return null
-    return blocks.map(b => ({ id: b.id, name: b.name, args: b.input }))
-  }
-  // OpenAI format
-  const toolCalls = response.choices?.[0]?.message?.tool_calls
-  if (!toolCalls?.length) return null
-  return toolCalls.map(tc => ({
-    id: tc.id,
-    name: tc.function.name,
-    args: JSON.parse(tc.function.arguments),
-  }))
+  if (!response?._webllm) return null
+  return _parseToolCalls(response.text)
 }
 
 export function extractText(response) {
-  const { provider } = getLLMConfig()
-  if (provider === 'anthropic') {
-    return (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
-  }
-  return response.choices?.[0]?.message?.content || ''
+  if (!response?._webllm) return ''
+  return response.text.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim()
 }
 
 export function getRawMessage(response) {
-  const { provider } = getLLMConfig()
-  if (provider === 'anthropic') return response.content
-  return response.choices?.[0]?.message
+  return { role: 'assistant', content: response.text }
 }
 
 export function formatToolResult(toolCallId, toolName, result) {
-  const { provider } = getLLMConfig()
-  if (provider === 'anthropic') {
-    return { type: 'tool_result', tool_use_id: toolCallId, content: JSON.stringify(result) }
+  return {
+    role: 'user',
+    content: `<tool_result id="${toolCallId}" name="${toolName}">\n${JSON.stringify(result, null, 2)}\n</tool_result>`,
   }
-  return { role: 'tool', tool_call_id: toolCallId, name: toolName, content: JSON.stringify(result) }
 }
 
 export function appendToolResults(messages, rawAssistantMessage, toolResults) {
-  const { provider } = getLLMConfig()
-  if (provider === 'anthropic') {
-    messages.push({ role: 'assistant', content: rawAssistantMessage })
-    messages.push({ role: 'user', content: toolResults.map(tr => tr.formatted) })
-  } else {
-    messages.push(rawAssistantMessage)
-    toolResults.forEach(tr => messages.push(tr.formatted))
-  }
+  messages.push(rawAssistantMessage)
+  const combined = toolResults.map(tr =>
+    `<tool_result id="${tr.id}" name="${tr.name}">\n${JSON.stringify(tr.result, null, 2)}\n</tool_result>`
+  ).join('\n')
+  messages.push({ role: 'user', content: combined })
 }
 
 export function appendCorrectionMessage(messages, rawAssistantMessage, correctionText) {
-  const { provider } = getLLMConfig()
-  if (provider === 'anthropic') {
-    messages.push({ role: 'assistant', content: rawAssistantMessage })
-    messages.push({ role: 'user', content: correctionText })
-  } else {
-    messages.push(rawAssistantMessage)
-    messages.push({ role: 'user', content: correctionText })
-  }
-}
-
-// ── Mock simulation ────────────────────────────────────────────
-// Used by orchestrator.js when provider === 'mock'
-// Returns a realistic tool-calling sequence without hitting any API.
-
-export function isMockMode() {
-  return getLLMConfig().provider === 'mock'
-}
-
-/**
- * testConnection — send a minimal "Say OK" prompt to verify the API key and proxy work.
- * @returns {Promise<{ text: string, latencyMs: number }>}
- */
-export async function testConnection() {
-  const { provider, apiKey, model, proxyUrl } = getLLMConfig()
-  const providerDef = getProviderDef(provider)
-  if (!providerDef) throw new Error(`Unknown provider: ${provider}`)
-
-  if (provider === 'mock') {
-    await new Promise(r => setTimeout(r, 600))
-    return { text: 'OK (mock)', latencyMs: 600 }
-  }
-
-  if (!apiKey) throw new Error('No API key configured.')
-
-  const proxy = proxyUrl || DEFAULT_PROXY
-  const start = Date.now()
-
-  if (providerDef.format === 'anthropic') {
-    const res = await fetch(proxy, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-target-url': providerDef.endpoint,
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 10,
-        messages: [{ role: 'user', content: 'Say OK' }],
-      }),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data?.error?.message || `Anthropic error ${res.status}`)
-    return { text: data.content?.[0]?.text || 'OK', latencyMs: Date.now() - start }
-  }
-
-  // OpenAI-compatible (OpenAI, NVIDIA NIM, Gemini)
-  let targetUrl = providerDef.endpoint
-  if (provider === 'nvidia' && !targetUrl.endsWith('/chat/completions')) {
-    targetUrl += '/chat/completions'
-  }
-  if (provider === 'gemini') {
-    targetUrl = `${providerDef.endpoint}/v1beta/models/${model}:generateContent?key=${apiKey}`
-  }
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'x-target-url': targetUrl,
-  }
-  if (provider !== 'gemini') headers['Authorization'] = `Bearer ${apiKey}`
-
-  let body
-  if (provider === 'gemini') {
-    body = { contents: [{ parts: [{ text: 'Say OK' }] }], generationConfig: { maxOutputTokens: 10 } }
-  } else {
-    body = { model, max_tokens: 10, messages: [{ role: 'user', content: 'Say OK' }] }
-  }
-
-  const res = await fetch(proxy, { method: 'POST', headers, body: JSON.stringify(body) })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data?.error?.message || `${providerDef.name} error ${res.status}`)
-
-  let text = ''
-  if (provider === 'gemini') {
-    text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'OK'
-  } else {
-    text = data.choices?.[0]?.message?.content || 'OK'
-  }
-  return { text: text.trim(), latencyMs: Date.now() - start }
+  messages.push(rawAssistantMessage)
+  messages.push({ role: 'user', content: correctionText })
 }

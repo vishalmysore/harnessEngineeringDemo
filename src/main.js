@@ -1,7 +1,7 @@
 import { runAgent } from './execution/orchestrator.js'
 import { saveCorrection, clearAllMemories, getAllMemories } from './information/memoryManager.js'
 import tracer from './feedback/tracer.js'
-import { PROVIDERS, setLLMConfig, getLLMConfig, getDefaultProxy, testConnection } from './utils/llm.js'
+import { WEBLLM_MODELS, loadModel, getModelStatus, setMockMode, isMockMode } from './utils/llm.js'
 import DOMAINS from './domains/index.js'
 
 let currentPlan     = null
@@ -10,37 +10,51 @@ let currentDomain   = null
 let agentRunning    = false
 let traceUnsub      = null
 
-// ── LLM config ────────────────────────────────────────────────
+// ── Model loading ─────────────────────────────────────────────
 
-function syncConfigFromUI() {
-  setLLMConfig({
-    provider: document.getElementById('provider').value,
-    apiKey:   document.getElementById('apiKey').value.trim(),
-    model:    document.getElementById('modelName').value,
-    proxyUrl: document.getElementById('proxyUrl').value.trim() || getDefaultProxy(),
-  })
+function setModelStatus(type, msg) {
+  const el = document.getElementById('modelStatus')
+  el.textContent = msg
+  el.className   = `test-result test-result-${type}`
 }
 
-function populateProviderModels(providerId) {
-  const prov = PROVIDERS.find(p => p.id === providerId)
-  const sel  = document.getElementById('modelName')
-  sel.innerHTML = ''
-  prov?.models.forEach(m => {
-    const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; sel.appendChild(o)
-  })
-  document.getElementById('apiKey').placeholder = prov?.keyPlaceholder || 'API key'
-  const noKey = providerId === 'mock'
-  document.getElementById('apiKey').disabled      = noKey
-  document.getElementById('apiKey').style.opacity = noKey ? '0.4' : '1'
-}
+async function handleLoadModel() {
+  const modelId = document.getElementById('modelSelect').value
+  const btn     = document.getElementById('loadModelBtn')
+  const prog    = document.getElementById('modelProgress')
+  const fill    = document.getElementById('modelProgressFill')
+  const label   = document.getElementById('modelProgressLabel')
 
-function syncConfigToUI() {
-  const cfg = getLLMConfig()
-  document.getElementById('provider').value = cfg.provider
-  populateProviderModels(cfg.provider)
-  if (cfg.model) document.getElementById('modelName').value = cfg.model
-  document.getElementById('apiKey').value  = cfg.apiKey || ''
-  document.getElementById('proxyUrl').value = cfg.proxyUrl || getDefaultProxy()
+  btn.disabled    = true
+  btn.textContent = '⟳ Loading…'
+  prog.classList.remove('hidden')
+  fill.style.width = '0%'
+  label.textContent = 'Initialising…'
+  document.getElementById('modelStatus').className = 'test-result hidden'
+
+  try {
+    await loadModel(modelId, (ev) => {
+      if (ev.type === 'device') {
+        label.textContent = 'WebGPU detected — starting download…'
+      } else if (ev.type === 'downloading') {
+        fill.style.width  = `${ev.progress}%`
+        label.textContent = `Downloading… ${ev.progress}%`
+      } else if (ev.type === 'phase' && ev.phase === 'compile') {
+        label.textContent = 'Compiling WebGPU shaders… (1–5 min on first load, cached after)'
+        fill.style.width  = '95%'
+      } else if (ev.type === 'ready') {
+        fill.style.width  = '100%'
+        label.textContent = 'Ready'
+      }
+    })
+    setModelStatus('ok', `✅ Model ready: ${modelId}`)
+  } catch (err) {
+    setModelStatus('fail', `❌ ${err.message}`)
+  } finally {
+    btn.disabled    = false
+    btn.textContent = '⬇ Load Model'
+    setTimeout(() => prog.classList.add('hidden'), 1500)
+  }
 }
 
 // ── Domain management ─────────────────────────────────────────
@@ -53,25 +67,20 @@ function updateDomainUI() {
   const domain = getActiveDomain()
   currentDomain = domain
 
-  // Accent color
   document.documentElement.style.setProperty('--domain-color', domain.color)
+  document.getElementById('domainDesc').textContent     = domain.description
+  document.getElementById('reviewerLabel').textContent  = domain.reviewerLabel
 
-  // Domain description
-  document.getElementById('domainDesc').textContent = domain.description
-
-  // Reviewer label
-  document.getElementById('reviewerLabel').textContent = domain.reviewerLabel
-
-  // Populate scenarios
   const sel = document.getElementById('scenarioSelect')
   sel.innerHTML = ''
   Object.values(domain.scenarios).forEach(s => {
-    const o = document.createElement('option'); o.value = s.id; o.textContent = `${s.id} — ${s.title}`; sel.appendChild(o)
+    const o = document.createElement('option')
+    o.value       = s.id
+    o.textContent = `${s.id} — ${s.title}`
+    sel.appendChild(o)
   })
 
   updateScenarioInfo()
-
-  // Reset output panels
   clearTrace()
   document.getElementById('clinicianPanel').innerHTML = waitingMsg()
 }
@@ -118,7 +127,7 @@ function appendTrace(event, data) {
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
 
-// ── Output render (domain-agnostic) ───────────────────────────
+// ── Output render ─────────────────────────────────────────────
 
 function waitingMsg() {
   return `<div class="waiting-msg"><div class="waiting-icon">⚕</div><p>Output will appear here after agent analysis completes.</p><p class="waiting-sub">Human-in-the-loop review before any recommendation is finalised.</p></div>`
@@ -194,38 +203,15 @@ function showMemoryCount() {
   document.getElementById('memoryBadge').textContent = `${n} correction${n !== 1 ? 's' : ''} in memory`
 }
 
-// ── Test connection ────────────────────────────────────────────
-
-async function handleTestConnection() {
-  syncConfigFromUI()
-  const cfg = getLLMConfig()
-  const btn = document.getElementById('testBtn')
-  if (cfg.provider !== 'mock' && !cfg.apiKey) { showTestResult('fail','❌ Enter an API key first.'); return }
-  btn.disabled = true; btn.textContent = '⟳ Testing…'
-  document.getElementById('testResult').className = 'test-result hidden'
-  try {
-    const { text, latencyMs } = await testConnection()
-    showTestResult('ok', `✅ Connected! Response: "${text.slice(0,40)}" (${latencyMs}ms)`)
-  } catch (err) {
-    showTestResult('fail', `❌ ${err.message}`)
-  } finally {
-    btn.disabled = false; btn.textContent = '🧪 Test'
-  }
-}
-
-function showTestResult(status, msg) {
-  const el = document.getElementById('testResult')
-  el.textContent = msg
-  el.className   = `test-result test-result-${status}`
-}
-
 // ── Execute ────────────────────────────────────────────────────
 
 async function executeAgent() {
   if (agentRunning) return
-  syncConfigFromUI()
-  const cfg = getLLMConfig()
-  if (cfg.provider !== 'mock' && !cfg.apiKey) { alert('Please enter your API key, or switch to Mock AI to test without one.'); return }
+
+  if (!isMockMode() && getModelStatus() !== 'ready') {
+    alert('Please load a local model first (or enable Mock mode to test without a GPU).')
+    return
+  }
 
   const domain   = getActiveDomain()
   const scenario = domain.scenarios[document.getElementById('scenarioSelect').value]
@@ -234,8 +220,8 @@ async function executeAgent() {
   agentRunning    = true
   currentPlan     = null
 
-  document.getElementById('executeBtn').disabled      = true
-  document.getElementById('executeBtn').textContent   = '⟳ Running…'
+  document.getElementById('executeBtn').disabled    = true
+  document.getElementById('executeBtn').textContent = '⟳ Running…'
   clearTrace()
   document.getElementById('clinicianPanel').innerHTML = `<div class="waiting-msg"><div class="waiting-icon">⟳</div><p>Agent analysing — events streaming in real time…</p></div>`
 
@@ -259,28 +245,43 @@ async function executeAgent() {
 // ── Init ──────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Provider dropdown
-  const provSel = document.getElementById('provider')
-  PROVIDERS.forEach(p => { const o = document.createElement('option'); o.value = p.id; o.textContent = `${p.icon} ${p.name}`; provSel.appendChild(o) })
+  // Populate model selector
+  const modelSel = document.getElementById('modelSelect')
+  WEBLLM_MODELS.forEach(m => {
+    const o = document.createElement('option')
+    o.value       = m.id
+    o.textContent = m.name
+    modelSel.appendChild(o)
+  })
 
   // Domain dropdown
   const domSel = document.getElementById('domainSelect')
-  Object.values(DOMAINS).forEach(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = `${d.icon} ${d.name}`; domSel.appendChild(o) })
+  Object.values(DOMAINS).forEach(d => {
+    const o = document.createElement('option')
+    o.value       = d.id
+    o.textContent = `${d.icon} ${d.name}`
+    domSel.appendChild(o)
+  })
 
-  syncConfigToUI()
   updateDomainUI()
   showMemoryCount()
 
-  provSel.addEventListener('change', () => { populateProviderModels(provSel.value); syncConfigFromUI() })
-  document.getElementById('apiKey').addEventListener('input', syncConfigFromUI)
-  document.getElementById('modelName').addEventListener('change', syncConfigFromUI)
-  document.getElementById('proxyUrl').addEventListener('input', syncConfigFromUI)
+  document.getElementById('loadModelBtn').addEventListener('click', handleLoadModel)
+
+  document.getElementById('mockToggle').addEventListener('change', (e) => {
+    setMockMode(e.target.checked)
+    document.getElementById('loadModelBtn').disabled    = e.target.checked
+    document.getElementById('modelSelect').disabled     = e.target.checked
+  })
+
   domSel.addEventListener('change', updateDomainUI)
   document.getElementById('scenarioSelect').addEventListener('change', updateScenarioInfo)
   document.getElementById('executeBtn').addEventListener('click', executeAgent)
-  document.getElementById('testBtn').addEventListener('click', handleTestConnection)
-  document.getElementById('resetProxyBtn').addEventListener('click', () => { document.getElementById('proxyUrl').value = getDefaultProxy(); syncConfigFromUI() })
   document.getElementById('resetMemoryBtn').addEventListener('click', () => {
-    if (confirm('Clear all saved corrections from local memory?')) { clearAllMemories(); showMemoryCount(); appendTrace('layer:info','Local memory reset.') }
+    if (confirm('Clear all saved corrections from local memory?')) {
+      clearAllMemories()
+      showMemoryCount()
+      appendTrace('layer:info', 'Local memory reset.')
+    }
   })
 })

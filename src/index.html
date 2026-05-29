@@ -22,27 +22,28 @@
     <div class="banner-center">
       <div class="config-row">
         <div class="config-field">
-          <label>Provider</label>
-          <select id="provider"></select>
-        </div>
-        <div class="config-field">
-          <label>Model</label>
-          <select id="modelName"></select>
-        </div>
-        <div class="config-field api-field">
-          <label>API Key <span class="key-note">(session only)</span></label>
-          <input id="apiKey" type="password" placeholder="sk-…" autocomplete="off" />
-        </div>
-        <div class="config-field proxy-field">
-          <label>CORS Proxy <button id="resetProxyBtn" class="btn-inline" title="Reset to default">↺</button></label>
-          <input id="proxyUrl" type="text" placeholder="https://your-proxy.workers.dev/" />
+          <label>Local Model <span class="key-note">(runs on your GPU — no API key)</span></label>
+          <select id="modelSelect"></select>
         </div>
         <div class="config-field test-field">
           <label>&nbsp;</label>
-          <button id="testBtn" class="btn btn-test">🧪 Test</button>
+          <button id="loadModelBtn" class="btn btn-test">⬇ Load Model</button>
+        </div>
+        <div class="config-field">
+          <label>&nbsp;</label>
+          <label class="mock-toggle-label">
+            <input type="checkbox" id="mockToggle" />
+            <span>Mock mode (no GPU)</span>
+          </label>
         </div>
       </div>
-      <div id="testResult" class="test-result hidden"></div>
+      <div id="modelProgress" class="model-progress hidden">
+        <div class="model-progress-bar-wrap">
+          <div id="modelProgressFill" class="model-progress-fill"></div>
+        </div>
+        <div id="modelProgressLabel" class="model-progress-label">Loading…</div>
+      </div>
+      <div id="modelStatus" class="test-result hidden"></div>
     </div>
 
     <div class="banner-right">
@@ -75,7 +76,7 @@
           </div>
 
           <button id="executeBtn" class="btn btn-execute">▶ Execute Agent</button>
-          <div class="mock-tip">💡 No API key? Select <strong>🧪 Mock AI</strong> — runs real tools &amp; guardrails without any network calls.</div>
+          <div class="mock-tip">💡 No GPU? Enable <strong>Mock mode</strong> above — runs real tools &amp; guardrails without a model.</div>
         </div>
       </div>
 
@@ -101,7 +102,7 @@
             <div class="trace-empty-icon">⟳</div>
             <p>Select a domain &amp; scenario, then click <strong>Execute Agent</strong>.</p>
             <p class="trace-empty-sub">Events stream here in real time, color-coded by layer.</p>
-            <p class="trace-empty-sub">Use <strong>Mock AI</strong> to demo without an API key.</p>
+            <p class="trace-empty-sub">Load a local model above, or enable <strong>Mock mode</strong> to demo without a GPU.</p>
           </div>
         </div>
       </div>
