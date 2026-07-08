@@ -1,0 +1,187 @@
+/* loop.css — page-specific styles for the Loop Engineering demo.
+   Reuses variables, buttons, and .trace-* palette from styles.css.
+   Scoped under .loop-page so it never affects the harness page. */
+
+/* styles.css locks the harness dashboard with `html, body { overflow:hidden;
+   height:100% }` — the loop page is a scrollable document, so re-enable scrolling.
+   loop.css is only linked from loop.html, so overriding html/body here is safe. */
+html { overflow-y: auto; height: auto; }
+body.loop-page { overflow: auto; height: auto; min-height: 100%; }
+
+.loop-main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: calc(var(--header-h) + 28px) 20px 60px;
+}
+
+/* ── Intro ─────────────────────────────────────────────────── */
+.loop-intro { margin-bottom: 28px; }
+.loop-intro h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+.loop-intro h1 #techCount { color: var(--accent); }
+.loop-intro p {
+  color: var(--text-muted);
+  max-width: 860px;
+  margin-bottom: 10px;
+  line-height: 1.65;
+}
+.loop-intro strong { color: var(--text); }
+.loop-intro em { color: var(--accent); font-style: normal; }
+.loop-intro code, .loop-footer code {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #79c0ff;
+}
+.loop-note { font-size: 13px; }
+.loop-note a, .loop-intro a { color: var(--accent); text-decoration: none; }
+.loop-note a:hover { text-decoration: underline; }
+
+/* ── Grid of technique cards ───────────────────────────────── */
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+}
+
+.tech-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tech-head { display: flex; align-items: flex-start; gap: 12px; }
+.tech-num {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--exec);
+  opacity: 0.55;
+  line-height: 1;
+  padding-top: 2px;
+}
+.tech-title { display: flex; flex-direction: column; gap: 6px; }
+.tech-title h3 { font-size: 15px; font-weight: 600; line-height: 1.25; }
+
+.lyr-badge {
+  align-self: flex-start;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid;
+}
+.lyr-badge.lyr-info     { color: var(--info);     border-color: #58a6ff55; background: #58a6ff12; }
+.lyr-badge.lyr-exec     { color: var(--exec);     border-color: #bc8cff55; background: #bc8cff12; }
+.lyr-badge.lyr-feedback { color: var(--feedback); border-color: #3fb95055; background: #3fb95012; }
+
+/* Real-use-case chip (domain + scenario the card runs) */
+.tech-usecase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.tech-usecase .uc-icon { font-size: 15px; line-height: 1; }
+.tech-usecase .uc-text { color: var(--text-muted); }
+.tech-usecase .uc-text strong { color: var(--text); }
+
+.tech-tagline { font-size: 13px; color: var(--text); font-weight: 500; }
+.tech-explain { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; }
+.tech-explain code {
+  background: var(--surface2);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: #79c0ff;
+}
+.tech-explain em { color: var(--warn); font-style: normal; }
+
+.tech-code { display: flex; flex-direction: column; gap: 4px; }
+.tech-code code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--exec);
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+
+.tech-run { margin-top: 2px; }
+.tech-run .btn-execute { width: auto; padding: 8px 16px; margin-top: 0; font-size: 13px; }
+
+/* Interactive HITL controls */
+.tech-controls:empty { display: none; }
+.tech-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+.tech-controls .btn { flex: 0 0 auto; padding: 7px 14px; }
+.decide-prompt { font-size: 12px; color: var(--text-muted); }
+
+/* Per-card trace panel — reuses .trace-* classes from styles.css */
+.tech-trace {
+  height: 180px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.tech-trace .trace-empty-sub { opacity: 0.5; padding: 6px; }
+.tech-trace .trace-entry {
+  display: flex;
+  gap: 8px;
+  padding: 3px 2px;
+  border-bottom: 1px solid #ffffff08;
+}
+.tech-trace .trace-time  { color: #444d56; flex: 0 0 auto; }
+.tech-trace .trace-label { flex: 0 0 auto; font-weight: 700; }
+.tech-trace .trace-msg   { color: #d1d5da; word-break: break-word; }
+
+/* Technique-framing lines emitted by the card itself */
+.trace-focus { background: #bc8cff0e; }
+.trace-focus .trace-label { color: var(--exec); }
+.trace-focus .trace-msg   { color: #d8c7ff; }
+
+.loop-footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.nav-link { text-decoration: none; display: inline-flex; align-items: center; }
+
+@media (max-width: 640px) {
+  .tech-grid { grid-template-columns: 1fr; }
+}

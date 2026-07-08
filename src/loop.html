@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loop Engineering Demo</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./loop.css" />
+</head>
+<body class="loop-page">
+  <!-- ── Header: same local-model loader as the harness demo ─────── -->
+  <header class="config-banner">
+    <div class="banner-left">
+      <div class="app-logo">
+        <span class="logo-icon">🔁</span>
+        <div>
+          <div class="app-title">Loop Engineering Demo</div>
+          <div class="app-sub">Real WebLLM agent loops on real domain use-cases · same 3-layer harness</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="banner-center">
+      <div class="config-row">
+        <div class="config-field">
+          <label>Local Model <span class="key-note">(runs on your GPU — no API key)</span></label>
+          <select id="modelSelect"></select>
+        </div>
+        <div class="config-field test-field">
+          <label>&nbsp;</label>
+          <button id="loadModelBtn" class="btn btn-test">⬇ Load Model</button>
+        </div>
+        <div class="config-field">
+          <label>&nbsp;</label>
+          <label class="mock-toggle-label">
+            <input type="checkbox" id="mockToggle" />
+            <span>Mock mode (no GPU)</span>
+          </label>
+        </div>
+      </div>
+      <div id="modelProgress" class="model-progress hidden">
+        <div class="model-progress-bar-wrap">
+          <div id="modelProgressFill" class="model-progress-fill"></div>
+        </div>
+        <div id="modelProgressLabel" class="model-progress-label">Loading…</div>
+      </div>
+      <div id="modelStatus" class="test-result hidden"></div>
+    </div>
+
+    <div class="banner-right">
+      <div id="memoryBadge" class="memory-badge">0 corrections in memory</div>
+      <button id="resetMemoryBtn" class="btn btn-reset">↺ Reset Memory</button>
+      <a href="./index.html" class="btn btn-reset nav-link">⚙ Harness Engineering →</a>
+    </div>
+  </header>
+
+  <!-- ── Body ───────────────────────────────────────────────────── -->
+  <main class="loop-main">
+    <section class="loop-intro">
+      <h1><span id="techCount">12</span> Loop-Engineering Techniques — on the Real Model</h1>
+      <p>
+        Loop engineering is the shift from <em>prompting</em> an agent to <em>designing the recurring cycle</em>
+        it runs unattended: inspect → act → verify → decide, with a real exit condition. Each card below binds a
+        technique to a <strong>real use-case</strong> from one of the four harness domains — Healthcare, Insurance,
+        Career, Drug Discovery — and runs it through the <strong>actual orchestrator</strong>
+        (<code>runAgent()</code>) on the local WebLLM model you load above. The loop, tools, guardrails and
+        verification are the production modules; the model is really doing the reasoning.
+      </p>
+      <p class="loop-note">
+        <strong>Load a model</strong> (⬇ above) to run on the real LLM, or tick <strong>Mock mode</strong> to run
+        the real tools + guardrails with no GPU. Then click <strong>Run this loop</strong> on any card. Techniques
+        are grouped by the same three layers as the <a href="./index.html">harness demo</a> and reuse its modules
+        without modifying them.
+      </p>
+    </section>
+
+    <section id="techGrid" class="tech-grid"><!-- cards injected by loop.js --></section>
+
+    <footer class="loop-footer">
+      <p>Everything runs client-side. No backend. Source: <code>src/loop.js</code> · shared harness in <code>src/execution/orchestrator.js</code>, <code>src/domains/</code>, <code>src/feedback/</code>, <code>src/information/</code>.</p>
+    </footer>
+  </main>
+
+  <script type="module" src="./loop.js"></script>
+</body>
+</html>

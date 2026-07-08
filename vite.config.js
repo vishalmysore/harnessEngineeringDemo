@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import { fileURLToPath } from 'node:url'
 
 const securityHeaders = {
   'Cross-Origin-Opener-Policy': 'same-origin',
@@ -12,6 +13,14 @@ export default defineConfig(({ command }) => ({
     outDir: '../dist',
     emptyOutDir: true,
     target: 'esnext',
+    rollupOptions: {
+      input: {
+        // Existing harness-engineering demo — unchanged default entry.
+        main: fileURLToPath(new URL('./src/index.html', import.meta.url)),
+        // New loop-engineering demo — additive sibling page.
+        loop: fileURLToPath(new URL('./src/loop.html', import.meta.url)),
+      },
+    },
   },
   worker: {
     format: 'es',
