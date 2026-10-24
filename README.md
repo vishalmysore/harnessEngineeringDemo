@@ -104,6 +104,7 @@ Deployment to GitHub Pages is handled automatically via `.github/workflows/deplo
 | Model | Download |
 |-------|----------|
 | Llama 3.2 3B (recommended) | ~2.0 GB |
+| Llama 3.2 3B f32 (Intel / integrated GPUs, where f16 builds can produce garbled text) | ~2.9 GB |
 | Phi-3.5 Mini | ~2.2 GB |
 | Qwen 2.5 3B | ~2.0 GB |
 | Gemma 2 2B | ~1.5 GB |

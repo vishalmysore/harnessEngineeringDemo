@@ -5,6 +5,7 @@
 
 export const WEBLLM_MODELS = [
   { id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC',  name: 'Llama 3.2 3B (~2.0 GB) — Recommended' },
+  { id: 'Llama-3.2-3B-Instruct-q4f32_1-MLC',  name: 'Llama 3.2 3B f32 (~2.9 GB) — Intel GPU' },
   { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC',   name: 'Phi-3.5 Mini (~2.2 GB)' },
   { id: 'Qwen2.5-3B-Instruct-q4f16_1-MLC',     name: 'Qwen 2.5 3B (~2.0 GB)' },
   { id: 'gemma-2-2b-it-q4f16_1-MLC',           name: 'Gemma 2 2B (~1.5 GB)' },

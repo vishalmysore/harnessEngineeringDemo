@@ -135,6 +135,9 @@ html, body {
   transition: border-color .15s;
 }
 
+/* keep the 64px banner on one line whatever the model labels are */
+#modelSelect { max-width: 290px; text-overflow: ellipsis; }
+
 .config-field select:focus,
 .config-field input:focus {
   border-color: var(--accent);

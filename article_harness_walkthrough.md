@@ -164,11 +164,15 @@ I tested this on an ordinary laptop with an Intel integrated GPU, which is about
 
 **When the model does not.** Small models wander. In later iterations the same model kept repeating its tool calls with the arguments left empty. The harness now refuses those calls before they run and tells the model which argument is missing, so the model gets a clear signal instead of a vague error.
 
-On another run the model produced pure noise. This happens with some half-precision model builds on integrated graphics: the numbers overflow and the text comes out scrambled.
+On another run the standard build of the model produced pure noise. This happens with half-precision (f16) model builds on some integrated graphics chips: the numbers overflow and the text comes out scrambled. That is why the model list also offers **Llama 3.2 3B f32**, a full-precision build for Intel and other integrated GPUs. It is a bigger download (about 2.9 GB), but its output stays readable.
 
-![Real model run where the output was not valid JSON and the harness flagged it and sent it to manual review](./docs/screenshots/harness/16-real-model-run.png)
+Here is a run on the f32 build:
 
-Look at what the harness did with it. The Feedback layer reported that the output was not valid JSON. No recommendation was produced, a clear warning was raised, and the case went to the clinician marked **Manual review required**. Nothing unsafe reached the review desk looking like a real answer.
+![Real Llama 3.2 3B f32 run: correct tool calls, guardrails firing, empty tool calls blocked, and the run stopped when the context window filled up](./docs/screenshots/harness/16-real-model-run.png)
+
+The model looks up the patient, the allergy alert fires, and the cross-allergy guardrail blocks amoxicillin. On the next turn it repeats the same calls with the arguments left empty, and the harness blocks each one and names the missing argument. It recovers and calls the tools properly again, and then again. It never moves on to writing its answer, and every repeat adds more tool results to the conversation. Eventually the conversation no longer fits in the model's 4,096-token memory, and the run stops.
+
+Look at what reached the review desk: a clear error, not a recommendation. In other runs, where the model finished with text that was not valid JSON, the Feedback layer flagged it and the case went to the clinician marked **Manual review required**. Either way, nothing unsafe reached the review desk looking like a real answer.
 
 That is the honest lesson of running agents on small local models: the model will sometimes fail, and the harness is what turns a silent failure into a visible one. On a stronger GPU, or with the larger models in the list, runs are faster and far more reliable. The safety behaviour stays the same either way, because it lives in the harness, not in the model.
 
