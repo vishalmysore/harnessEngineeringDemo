@@ -88,6 +88,27 @@ function validateFinalPlan(plan, toolResults) {
     const hasSIU = (plan.recommendations || []).some(r => r.item?.toLowerCase().includes('investigation') || r.item?.toLowerCase().includes('siu'))
     if (!hasSIU) errors.push('HIGH fraud risk detected — SIU referral must be included in recommendations')
   }
+
+  // The answer must not invent a fraud score: any score it quotes has to be the tool's
+  const planText = JSON.stringify(plan)
+  const toolScore = fraudResult?.result?.score
+  if (typeof toolScore === 'number') {
+    const quoted = [...planText.matchAll(/fraud[^0-9]{0,40}?(0\.\d+)/gi)].map(m => Number(m[1]))
+    const wrong = quoted.find(s => Math.abs(s - toolScore) > 0.005)
+    if (wrong !== undefined) errors.push(`The answer states a fraud score of ${wrong}, but assessFraudRisk returned ${toolScore} — use the tool's score`)
+  }
+
+  // A claim above the policy maximum must be capped at that maximum
+  const claim = toolResults.find(r => r.name === 'getClaimDetails' && !r.result?.error)?.result
+  const policy = claim && POLICIES[claim.policyId]
+  if (policy) {
+    const maxLimit = Math.max(...Object.values(policy).filter(v => typeof v === 'number' && v > 1000))
+    const limitMentioned = /limit|partial|cap(ped)?\b/i.test(planText) &&
+      (planText.includes(String(maxLimit)) || planText.includes(maxLimit.toLocaleString('en-US')))
+    if (claim.amount > maxLimit && !limitMentioned) {
+      errors.push(`Claim ($${claim.amount.toLocaleString('en-US')}) exceeds the $${maxLimit.toLocaleString('en-US')} policy limit — recommend a settlement capped at the limit and say the claimant covers the difference`)
+    }
+  }
   return { valid: errors.length === 0, errors }
 }
 

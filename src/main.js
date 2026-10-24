@@ -137,6 +137,18 @@ function appendTrace(event, data) {
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
 
+// Real models sometimes return objects where the schema asks for strings
+// (e.g. warnings: [{ warning: '…', severity: 'HIGH' }]) — show their text, not "[object Object]"
+function asText(v) {
+  if (v == null) return ''
+  if (typeof v !== 'object') return String(v)
+  if (Array.isArray(v)) return v.map(asText).filter(Boolean).join('; ')
+  const preferred = v.warning ?? v.message ?? v.text ?? v.item ?? v.description ?? v.detail
+  if (preferred != null) return asText(preferred)
+  return Object.values(v).map(asText).filter(Boolean).join(' — ')
+}
+const toList = v => Array.isArray(v) ? v : v ? [v] : []
+
 // ── Output render ─────────────────────────────────────────────
 
 function waitingMsg() {
@@ -146,29 +158,29 @@ function waitingMsg() {
 function renderPlan(plan, domain) {
   const panel = document.getElementById('clinicianPanel')
 
-  const recsHtml = (plan.recommendations || []).map(r => {
+  const recsHtml = toList(plan.recommendations).map(r => {
     const pCls = r.priority === 'high' ? 'rec-high' : r.priority === 'low' ? 'rec-low' : 'rec-medium'
     return `<div class="rec-card ${pCls}">
-      <strong>${esc(r.item || r.name || 'Recommendation')}</strong>
-      <span class="rec-detail">${esc(r.detail || r.dose || '')}</span>
+      <strong>${esc(asText(r.item || r.name) || asText(r) || 'Recommendation')}</strong>
+      <span class="rec-detail">${esc(asText(r.detail || r.dose))}</span>
     </div>`
   }).join('')
 
-  const warnHtml = (plan.warnings || []).map(w => `<div class="warning-item">⚠ ${esc(w)}</div>`).join('')
-  const nonHtml  = (plan.non_action_items || plan.non_pharmacological || []).map(r => `<li>${esc(r)}</li>`).join('')
+  const warnHtml = toList(plan.warnings).map(w => `<div class="warning-item">⚠ ${esc(asText(w))}</div>`).join('')
+  const nonHtml  = toList(plan.non_action_items || plan.non_pharmacological).map(r => `<li>${esc(asText(r))}</li>`).join('')
 
   panel.innerHTML = `
     <div class="care-plan-header">
       <h3>${esc(domain.reviewerLabel)} — Pending Review</h3>
       <div class="review-badge" style="border-color:var(--domain-color);color:var(--domain-color)">⚑ Sign-Off Required</div>
     </div>
-    <div class="plan-section"><label>Summary</label><p>${esc(plan.summary || plan.patient_summary || '')}</p></div>
-    <div class="plan-section"><label>Assessment</label><p>${esc(plan.assessment || plan.diagnosis_hypothesis || '')}</p></div>
+    <div class="plan-section"><label>Summary</label><p>${esc(asText(plan.summary || plan.patient_summary))}</p></div>
+    <div class="plan-section"><label>Assessment</label><p>${esc(asText(plan.assessment || plan.diagnosis_hypothesis))}</p></div>
     <div class="plan-section"><label>Recommendations</label>${recsHtml || '<p class="empty">No recommendations generated.</p>'}</div>
     ${warnHtml ? `<div class="plan-section warnings-section"><label>Warnings &amp; Risks</label>${warnHtml}</div>` : ''}
     ${nonHtml  ? `<div class="plan-section"><label>Supporting Actions</label><ul class="non-pharm">${nonHtml}</ul></div>` : ''}
-    <div class="plan-section"><label>Reasoning</label><p>${esc(plan.reasoning || plan.reason || '')}</p></div>
-    <div class="plan-section"><label>Follow-Up</label><p>${esc(plan.follow_up || 'Reassess as needed.')}</p></div>
+    <div class="plan-section"><label>Reasoning</label><p>${esc(asText(plan.reasoning || plan.reason))}</p></div>
+    <div class="plan-section"><label>Follow-Up</label><p>${esc(asText(plan.follow_up) || 'Reassess as needed.')}</p></div>
     <div class="hitl-actions">
       <button id="approveBtn" class="btn btn-approve">✓ Approve</button>
       <button id="rejectBtn"  class="btn btn-reject">✗ Reject &amp; Correct</button>

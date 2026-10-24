@@ -89,7 +89,12 @@ function validateFinalPlan(plan, toolResults) {
   const errors = []
   const tox = toolResults.find(r => r.name === 'assessToxicologyProfile')
   if (tox?.result?.hepatotoxicityScore >= 0.7) {
-    const blockedInRecs = (plan.recommendations || []).some(r => r.item?.toLowerCase().includes('ind') || r.item?.toLowerCase().includes('phase 1'))
+    // Flag recommendations that push toward IND / Phase 1 — not ones saying to hold off
+    // ("structural modification before IND filing" is exactly the right answer)
+    const pushesAhead = text => /\b(ind|phase\s*1)\b/i.test(text) &&
+      !/\b(before|until|prior to|not|no|halt|hold|block|blocked|delay|defer|pause|after|cannot|can't|resolve|stop)\b/i.test(text)
+    const blockedInRecs = (Array.isArray(plan.recommendations) ? plan.recommendations : [])
+      .some(r => pushesAhead(typeof r === 'string' ? r : `${r.item || ''} ${r.detail || ''}`))
     if (blockedInRecs) errors.push('IND filing cannot be recommended when hepatotoxicity score ≥ 0.7 — structural modification must come first')
   }
   return { valid: errors.length === 0, errors }

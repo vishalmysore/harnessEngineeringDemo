@@ -1,14 +1,14 @@
 ---
-title: "Harness Engineering for AI Agents: A Hands-On Walkthrough in Your Browser"
-description: "See harness engineering in action. A free browser demo runs an AI agent with tools, guardrails, human review and memory across healthcare, insurance, career and drug discovery. Step-by-step screenshots."
-keywords: harness engineering, AI agent harness, agent guardrails, human in the loop AI, agentic loop, WebLLM, WebGPU, local LLM, AI agent memory, AI safety guardrails
+title: "Harness Engineering for AI Agents: A Real-Model Walkthrough in Your Browser"
+description: "Harness engineering, tested on a real local LLM. Llama 3.2 3B runs in the browser with tools, guardrails, human review and memory across healthcare, insurance, career and drug discovery. Real screenshots, real mistakes, and how the harness caught them."
+keywords: harness engineering, AI agent harness, agent guardrails, human in the loop AI, agentic loop, WebLLM, WebGPU, local LLM, Llama 3.2, AI agent memory, AI safety guardrails, small language models
 ---
 
-# Harness Engineering for AI Agents: A Hands-On Walkthrough in Your Browser
+# Harness Engineering for AI Agents: A Real-Model Walkthrough in Your Browser
 
-Most people judge an AI agent by the model inside it. Swap in a bigger model, get a better agent. That is only half the story. The other half is everything wrapped around the model: what it is allowed to look up, which actions get stopped before they happen, who signs off on the result, and what the system remembers the next time. That wrapper is called the **harness**, and designing it well is what people now call **harness engineering**.
+Most people judge an AI agent by the model inside it. Swap in a bigger model, get a better agent. That is only half the story. The other half is everything wrapped around the model: what it is allowed to look up, which actions get stopped before they happen, who signs off on the result, and what the system remembers next time. That wrapper is called the **harness**, and designing it well is what people now call **harness engineering**.
 
-It is easy to agree with that idea in the abstract and much harder to picture it. So I built a small demo that you can open in a browser tab and click through. No account, no API key, no server. This article walks through it screen by screen.
+It is easy to agree with that idea in the abstract and much harder to picture it. So I built a demo that runs in a browser tab: a real language model, real tools, real guardrails, and a human review desk. No account, no API key, no server. Every screenshot in this article comes from a real model running on an ordinary laptop. No scripted answers.
 
 **Try it yourself:** [vishalmysore.github.io/harnessEngineeringDemo](https://vishalmysore.github.io/harnessEngineeringDemo/)
 
@@ -24,17 +24,17 @@ The same pattern shows up everywhere an agent makes a decision that matters:
 - A drug discovery assistant advances a compound with a liver-toxicity signal.
 - A career assistant gives advice that quietly depends on someone's age.
 
-You do not fix these by writing a longer prompt. You fix them by building checks *around* the model that run every time, whatever the model says.
+You do not fix these by writing a longer prompt. You fix them by building checks *around* the model that run every time, whatever the model says. As you will see below, that matters even more with small models, which make mistakes often.
 
 ## The solution: three layers around the model
 
-The demo organises the harness into three layers. The names are plain on purpose:
+The demo organises the harness into three layers:
 
 | Layer | What it does | In the demo |
 |-------|--------------|-------------|
 | **1. Information** | Decides what the model knows before it starts | Looks up past human corrections, assembles the prompt, describes the available tools |
-| **2. Execution** | Runs the loop and enforces the rules | Calls tools, checks every result against guardrails, stops unsafe actions, retries when needed |
-| **3. Feedback** | Checks the output and learns from people | Validates the output format, asks a human to approve or correct, saves corrections to memory |
+| **2. Execution** | Runs the loop and enforces the rules | Calls tools, checks every result against guardrails, stops unsafe actions, keeps the loop on track |
+| **3. Feedback** | Checks the output and learns from people | Validates the answer, checks it against domain rules, asks a human to approve or correct, saves corrections to memory |
 
 The model sits in the middle. It plans, asks for tools and writes the recommendation. The harness decides what happens to every one of those steps.
 
@@ -42,176 +42,179 @@ The model sits in the middle. It plans, asks for tools and writes the recommenda
 
 ## A tour of the interface
 
-When you open the page, you see three columns: the case on the left, a live trace of the agent in the middle, and a review desk on the right.
+The page has three columns: the case on the left, a live trace of the agent in the middle, and a review desk on the right.
 
 ![Harness engineering demo landing page showing domain and scenario selection, an empty live trace and the human review desk](./docs/screenshots/harness/01-landing.png)
 
-The left column picks a **domain** (healthcare, insurance, career counselling or drug discovery) and a **scenario** within it. Each scenario is a realistic case with a short description and tags. Below that, three coloured cards remind you which layer is which. The same colours are used in the trace, so you can always tell which layer is speaking.
+The left column picks a **domain** (healthcare, insurance, career counselling or drug discovery) and a **scenario** within it. Below that, three coloured cards name the layers. The same colours are used in the trace, so you can always tell which layer is speaking.
 
-Across the top is the model loader:
+Across the top is the model loader. For this article I used **Llama 3.2 3B**, a small open model, in its full-precision (f32) build:
 
-![Model loader bar with local model picker, Load Model button, Mock mode toggle and memory counter](./docs/screenshots/harness/02-model-loader.png)
+![Model loader showing Llama 3.2 3B f32 loaded and ready to run locally on WebGPU](./docs/screenshots/real/00-model-ready.png)
 
-There are two ways to run the agent:
+The model downloads once (about 2.9 GB), is cached by the browser, and runs on your graphics card through WebGPU. Nothing you type leaves your computer. I ran everything on a laptop with Intel integrated graphics, about the hardest place to run a language model, so each case took between 6 and 18 minutes. A dedicated GPU is much faster.
 
-1. **Load a real model.** Pick one of the small open models (Llama 3.2, Phi-3.5, Qwen 2.5 or Gemma 2) and it downloads once, then runs on your own graphics card through WebGPU. Nothing you type leaves your computer.
-2. **Mock mode.** No download and no GPU needed. The model's text is replaced by a scripted answer, but the tools, guardrails, verification and memory are the same code that runs in real mode. It is the fastest way to see how the harness behaves.
-
-On the right of the bar is a counter of how many human corrections are stored in memory, a reset button, and a link to the companion [Loop Engineering page](./article_loop_engineering.md).
+There is also a **Mock mode** checkbox. It swaps the model's text for a scripted answer but keeps the real tools, guardrails and memory, so you can see the harness work in seconds without a download.
 
 ---
 
 ## Walkthrough 1: a child with a penicillin allergy
 
-Let's start with the case that shows the whole harness in one run. An 8-year-old has confirmed strep throat. The parent is asking for amoxicillin. The chart says the child had anaphylaxis to penicillin.
+An 8-year-old has confirmed strep throat. The parent is asking for amoxicillin. The chart says the child had anaphylaxis to penicillin.
 
-![Full run of the penicillin allergy scenario showing the trace and the clinician review card](./docs/screenshots/harness/03-healthcare-allergy-run.png)
+![Real Llama 3.2 3B run of the penicillin allergy case: tool calls, allergy alert, cross-allergy guardrail and an alternative antibiotic recommendation](./docs/screenshots/real/01-healthcare-allergy-run.png)
 
-Here is the trace on its own, so you can read it top to bottom:
+Here is the trace on its own:
 
-![Live harness trace colour-coded by layer, with an allergy alert and a high-risk interaction guardrail](./docs/screenshots/harness/04-trace-panel.png)
+![Live harness trace from a real model run, colour-coded by layer, with an allergy alert, a high-risk interaction guardrail and a skipped repeat call](./docs/screenshots/real/02-trace-panel.png)
 
-Reading it line by line:
+Reading it top to bottom:
 
-- **Information layer (blue).** The harness searches past corrections, finds none for this case, and builds the prompt.
-- **Execution layer (purple).** The agent fetches the patient's record. The moment the record comes back, a guardrail fires an **allergy alert**: penicillin is listed, so every prescription must be cross-checked.
-- **Guardrail (red).** The agent checks penicillin against amoxicillin and the guardrail flags a **high-risk cross-allergy**. This is not the model's opinion. It is a rule in code that runs on every tool result.
-- **Feedback layer (green).** The final answer is checked against the required format before anyone sees it.
+- **Information layer (blue).** The harness searches past corrections, finds none, and builds the prompt.
+- **Execution layer (purple).** The model asks for the patient's record. When it comes back, a guardrail raises an **allergy alert**.
+- **Guardrail (red).** The model checks amoxicillin against penicillin, and the guardrail flags a **high-risk cross-allergy** and points to azithromycin. This is a rule in code, not the model's opinion, and it runs on every tool result.
+- **Execution layer, again.** On its next turn the model asks for the same three tools all over again. Small models do this a lot. The harness notices it already has those results, skips the calls, and tells the model to write its answer.
+- **Feedback layer (green).** The answer is checked before anyone sees it.
 
-The result lands on the clinician's desk:
+The recommendation lands on the clinician's desk:
 
-![Clinician review card recommending azithromycin with warnings about the penicillin allergy](./docs/screenshots/harness/05-review-desk.png)
+![Clinician review card from the real run recommending a macrolide antibiotic such as azithromycin](./docs/screenshots/real/03-review-desk.png)
 
-The recommendation is azithromycin, the usual alternative for penicillin-allergic patients, and the warnings explain why amoxicillin was ruled out. Note the **Sign-Off Required** badge. Nothing is final until a person approves it.
+Amoxicillin is ruled out, and the model suggests a macrolide such as azithromycin or clarithromycin. The **Sign-Off Required** badge means nothing is final until a person approves it.
 
 ## Walkthrough 2: the agent learns from a correction
 
-Suppose the clinician wants the advice to go further. They click **Reject & Correct** and type what the agent should have said:
+The clinician wants the advice to go further, so they click **Reject & Correct** and write what the agent should have said:
 
-![Reject and correct form where the clinician types a correction about beta-lactam antibiotics](./docs/screenshots/harness/06-reject-and-correct.png)
+![Reject and correct form where the clinician types a correction about beta-lactam antibiotics](./docs/screenshots/real/04-reject-and-correct.png)
 
-When they submit, the correction is saved to memory. The counter at the top changes to **1 correction in memory** and the trace confirms it:
+The correction is saved to memory, and the counter at the top changes to **1 correction in memory**:
 
-![Correction saved to memory, memory counter shows one correction](./docs/screenshots/harness/07-correction-saved.png)
+![Correction saved to memory on the real run, memory counter shows one correction](./docs/screenshots/real/05-correction-saved.png)
 
-Now run the same case again. Look at the third line of the trace:
+Now run the same case again:
 
-![Second run of the same case, the information layer reports it found one relevant correction](./docs/screenshots/harness/08-memory-recalled.png)
+![Second real run of the same case: the information layer finds one relevant correction and the recommendation now includes clindamycin](./docs/screenshots/real/06-memory-recalled.png)
 
-*"Found 1 relevant correction(s)."* The harness pulled the clinician's note out of memory and placed it in the prompt before the model started. Nobody retrained anything. The agent simply starts the next similar case knowing what a human told it last time.
+The third line now reads *"Found 1 relevant correction(s)."* The harness put the clinician's note in the prompt before the model started, and it shows in the answer. This time the model recommends **azithromycin or clindamycin**. Clindamycin came from the clinician's correction; the first run never mentioned it. Nobody retrained anything.
 
-Memory is kept per domain. A healthcare correction about antibiotics will never appear in an insurance claim or a career plan, even if a few words happen to overlap.
+Memory is kept per domain, so a healthcare note about antibiotics never leaks into an insurance claim or a career plan.
 
 ## Walkthrough 3: a dangerous drug combination
 
 A 62-year-old on warfarin, a blood thinner, asks for aspirin for a headache.
 
-![Warfarin and aspirin scenario showing a high-risk bleeding interaction and an acetaminophen recommendation](./docs/screenshots/harness/09-healthcare-warfarin.png)
+![Real run of the warfarin and aspirin case: coverage reminder, bleeding-risk guardrail, JSON retry and a recommendation to avoid aspirin](./docs/screenshots/real/07-healthcare-warfarin.png)
 
-The agent checks warfarin against aspirin and the guardrail stops it: the two together sharply raise the risk of bleeding. It also checks the patient's other medication, metoprolol, against aspirin. The final recommendation switches to acetaminophen and says why. Every interaction check is visible in the trace, so a reviewer can see exactly what was checked, not just the conclusion.
+This run shows the harness keeping a small model on track twice:
+
+1. After reading the patient record, the model tried to answer straight away, without checking any interactions. The harness saw that two tools were never used and asked the model to call any that mattered. It went back and checked warfarin against aspirin, and the guardrail flagged the bleeding risk.
+2. The model's next reply was not a proper answer. The harness asked once for the answer in the required format, and the second attempt passed.
+
+The final recommendation: avoid aspirin, because it raises the bleeding risk on warfarin, with acetaminophen named as the safer option.
 
 ---
 
 ## The same harness, four different jobs
 
-The loop in the middle is the same for every domain. Only the tools, the rules and the reviewer change. That is the point of harness engineering: you build the structure once, then plug in each domain's knowledge.
+The loop in the middle is the same for every domain. Only the tools, the rules and the reviewer change.
 
 ### Insurance: a suspicious car claim
 
-An $8,500 rear-end collision claim. The claimant has three previous claims, there is no police report, and medical treatment began ten days after the accident.
+An $8,500 rear-end collision claim. The claimant has three previous claims, there is no police report, and medical treatment started ten days after the accident.
 
-![Insurance fraud scenario with a policy exclusion warning and a high fraud risk guardrail recommending SIU referral](./docs/screenshots/harness/10-insurance-fraud.png)
+![Real run of the insurance fraud case: claim details, policy exclusions, fraud score 0.72, SIU referral recommended](./docs/screenshots/real/08-insurance-fraud.png)
 
-Two guardrails fire. The first reminds the agent which exclusions apply to the policy. The second is the important one: the fraud score is 0.72, above the 0.70 threshold, so the claim **must** go to the Special Investigation Unit before any money is paid. The agent recommends exactly that, plus a documentation request and a hold on the settlement. The claims adjuster still has the final say.
+The model pulled the claim, the policy and the fraud score. The fraud score came back at 0.72, over the 0.70 threshold, so the guardrail requires a referral to the Special Investigation Unit before any payment. The model's first recommendation is exactly that.
 
-A second insurance case shows a softer guardrail. A totalled car is worth $67,000, but the policy limit is $55,000:
+The second recommendation shows why the review desk exists. The model wrote a "shortfall notification" claiming the $8,500 claim exceeds a $10,000 limit. That is wrong twice: $8,500 is less than $10,000, and the policy's real collision limit is $50,000. No rule in the harness checks that kind of made-up arithmetic, and that is the claims adjuster's job. A harness does not make a small model infallible. It makes sure a person sees the answer, with the evidence beside it, before anything happens.
 
-![Claims adjuster review recommending a partial settlement capped at the policy limit](./docs/screenshots/harness/11-insurance-limit-review.png)
+### Insurance: a claim above the policy limit
 
-The harness does not block the claim. It caps the recommendation at the policy limit and states clearly that the remaining $12,000 is the claimant's responsibility. Some rules stop the agent; others shape its answer.
+A totalled car is worth $67,000, but the policy limit is $55,000. The fraud score is low.
+
+![Real run of the total-loss case: the final check rejects an invented fraud score and a missing policy cap, then the model corrects itself to a settlement capped at $55,000](./docs/screenshots/real/09-insurance-limit.png)
+
+This is the most interesting run in the set. The model's first answer **invented a fraud score of 0.85** (the tool said 0.18) and ignored the policy limit. Both mistakes were caught by the insurance domain's final check, which compares the answer with the tool results:
+
+> The answer states a fraud score of 0.85, but assessFraudRisk returned 0.18. Use the tool's score. Claim ($67,000) exceeds the $55,000 policy limit. Recommend a settlement capped at the limit and say the claimant covers the difference.
+
+The harness sent those exact errors back, and the model fixed its answer: **settlement capped at the $55,000 collision limit, with the claimant covering the remaining $12,000.** The tool results, not the model's memory, decided the numbers.
 
 ### Career counselling: retraining after a layoff
 
 A 41-year-old assembly line technician with 18 years of precision manufacturing experience has been laid off and wants to move into CNC machining.
 
-![Career counselling scenario producing a CNC retraining plan with certifications and skill gaps](./docs/screenshots/harness/12-career-retraining.png)
+![Real run of the career case: applicant profile, coverage reminder, job market lookup and a CNC retraining plan](./docs/screenshots/real/10-career-retraining.png)
 
-The agent loads the applicant's profile, pulls job market data for CNC technicians, and runs a skill-gap analysis. The plan that comes back is concrete: a starting certification, a community college programme, the two skills that matter most for the role, and an estimated four months to transition. The career domain also carries fairness rules. For applicants over 50 the harness adds a note telling the agent to stay age-neutral and skills-focused, and a final check rejects any plan that promises a specific salary. A good harness enforces rules about *how* a decision is made, not only *what* it says.
+The plan is sensible: a CNC programme at a community college or vocational school, hands-on experience through internships or part-time work, and certification through bodies like NIMS. The run also shows a small model's limits. Asked to check the job market, it looked up "cnc-operator", but the data uses "cnc-technician". The tool replied with the list of valid roles, and the model answered anyway instead of trying again. The career rules also keep advice skills-focused: older applicants get an age-neutral reminder, and any plan that promises a specific salary is rejected.
 
 ### Drug discovery: a compound with a liver-toxicity signal
 
-A PARP inhibitor for ovarian cancer is very potent, but it scores 0.78 on hepatotoxicity and shows a cardiac safety concern.
+A PARP inhibitor for ovarian cancer is very potent, but it scores 0.78 on hepatotoxicity (liver toxicity) and shows a cardiac safety concern.
 
-![Drug discovery scenario where the hepatotoxicity guardrail blocks IND filing](./docs/screenshots/harness/13-drug-hepatotox-block.png)
+![Real run of the drug discovery case: repeat call skipped, coverage reminder, hepatotoxicity guardrail blocks IND filing, recommendation not to advance](./docs/screenshots/real/11-drug-hepatotox-block.png)
 
-The toxicology tool returns the score, and the guardrail compares it to a 0.70 threshold. It is over, so **filing to start human trials is blocked** until the problem is resolved. The agent's recommendation follows the rule: stop advancement, run liver-safety studies, and start a chemistry programme to remove the part of the molecule causing the problem.
+The model looked up the compound, asked for the same profile again (skipped), and then tried to answer without looking at the toxicology data. The coverage reminder sent it back to run the toxicology check. The score came back above the 0.70 threshold, and the guardrail **blocked filing to start human trials** until the problem is fixed. The model's recommendation follows the rule: IND advancement is not recommended, citing both the liver signal and the cardiac (hERG) concern.
 
-The scientific review committee approves the plan:
+This case also caught a bug in the harness itself. The original rule flagged any recommendation containing the letters "ind", so it rejected the correct advice "structural modification before IND filing" as if it were pushing for a filing. A guardrail with a false positive is still a broken guardrail, and only a real model's wording exposed it. The rule now blocks only recommendations that push ahead, like "proceed to IND filing", and not ones that say to hold off.
 
-![Scientific review committee approving the drug discovery recommendation](./docs/screenshots/harness/14-drug-approved.png)
+The scientific review committee signs off:
 
----
-
-## Running it on a real local model
-
-Mock mode is great for seeing the harness, but the real test is putting an actual language model inside it. Click **Load Model** and the model downloads once, is cached by the browser, and runs on your GPU.
-
-![Model loaded notice showing Llama 3.2 3B ready to run locally on WebGPU](./docs/screenshots/harness/15-real-model-loaded.png)
-
-I tested this on an ordinary laptop with an Intel integrated GPU, which is about the hardest place to run a language model. The results are worth sharing as they happened, because they show why the harness exists.
-
-**When the model behaves.** On its first pass through the penicillin case, Llama 3.2 3B did exactly what you want. It fetched the patient record, the allergy alert fired, it checked amoxicillin against penicillin, and the cross-allergy guardrail stepped in with "contraindicated, use azithromycin instead." That is the same chain of events as the walkthrough above, driven by a real model running on the laptop.
-
-**When the model does not.** Small models wander. Two habits showed up again and again on this laptop:
-
-- **Asking again for what it already has.** After getting its tool results, the model would request the very same tools again, sometimes with the arguments left empty. Left alone, it kept looping until the conversation no longer fit in its 4,096-token memory.
-- **Scrambled text.** The standard half-precision (f16) build of the model sometimes produced pure noise. This happens on some integrated graphics chips, where the numbers overflow. That is why the model list also offers **Llama 3.2 3B f32**, a full-precision build for Intel and other integrated GPUs. It is a bigger download (about 2.9 GB), but its output stays readable.
-
-The first habit is a harness problem, so the harness fixes it. It remembers every tool call that has already run. When the model asks for the same thing again, the harness skips the call and tells the model plainly: you already have these results, write your final answer now. If the model ignores that twice in a row, the harness stops the run and sends the case for manual review instead of letting it spin.
-
-Here is the full penicillin case on the f32 build, running for real on the laptop:
-
-![Real Llama 3.2 3B f32 run: tool calls, allergy and cross-allergy guardrails, a repeat call skipped, and a valid azithromycin recommendation on the clinician review desk](./docs/screenshots/harness/16-real-model-run.png)
-
-The model looks up the patient, the allergy alert fires, and the cross-allergy guardrail blocks amoxicillin. On its next turn it asks for the same three tools again. The harness skips them and asks for the final answer, and this time the model writes it: a proper recommendation of a macrolide antibiotic such as azithromycin, with the allergy explained. It passes the format check and lands on the clinician's desk for sign-off. The whole run took about seven minutes on integrated graphics.
-
-When a run does fail, the harness makes the failure visible. Output that is not valid JSON is flagged by the Feedback layer and goes to the clinician marked **Manual review required**. Nothing unsafe reaches the review desk looking like a real answer.
-
-That is the honest lesson of running agents on small local models: the model will sometimes fail, and the harness is what turns a silent failure into a visible one. On a stronger GPU, or with the larger models in the list, runs are faster and far more reliable. The safety behaviour stays the same either way, because it lives in the harness, not in the model.
+![Scientific review committee approving the drug discovery recommendation from the real model run](./docs/screenshots/real/12-drug-approved.png)
 
 ---
+
+## What it took to make a small model work
+
+The first time I ran a real model through this harness, it almost never finished. The guardrails worked, but the model wandered: it repeated tool calls, answered too early, echoed tool output instead of answering, and invented numbers. Each fix below is ordinary code in the harness. None of them touch the model.
+
+| What the model did | What the harness does now |
+|---|---|
+| Asked again for tool results it already had, sometimes with empty arguments, until it ran out of memory | Remembers every call that has run, skips repeats, and tells the model to write its answer. After two ignored nudges it stops and sends the case to a person |
+| Tried to answer before using the important tools | Once per case, names the tools it has not used and asks it to call any that matter |
+| Replied with copied tool output instead of an answer | Treats that as "not an answer" and asks once more for the answer in the required format |
+| Quoted a fraud score the tool never returned, and ignored the policy limit | Domain checks compare the answer with the tool results and send back the exact discrepancy |
+| Kept failing a domain rule | Allows two revisions, then sends the answer to the reviewer with every violation listed at the top |
+
+The model also produced garbled text on this laptop with its standard half-precision (f16) build, because the numbers overflow on some integrated graphics chips. That is why the model list includes the full-precision **Llama 3.2 3B f32** build for Intel and other integrated GPUs.
+
+This is harness engineering in practice. The model stayed the same. The system around it learned to notice when the model drifts and steer it back, and when it can't, to make the failure obvious to a human.
 
 ## Why this matters
 
-**For teams building agents.** Most of the safety in this demo has nothing to do with the model. The allergy check, the fraud threshold, the toxicity block and the format check are ordinary code. They are easy to test, easy to audit and they behave the same way every time. When you upgrade the model, they keep working.
+**For teams building agents.** Most of the safety here is ordinary code: the allergy check, the fraud threshold, the toxicity block, the "use the tool's number" rule. It is easy to test and audit, and it behaves the same way every time. When you upgrade the model, it keeps working.
 
-**For people reviewing AI decisions.** The live trace turns the agent from a black box into a list of steps. A clinician or claims adjuster can see which tools ran, which rules fired, and why the recommendation changed, before they sign off.
+**For people reviewing AI decisions.** The live trace turns the agent into a list of steps. A reviewer can see which tools ran, which rules fired and why the answer changed. That is how the adjuster in the fraud case would spot the made-up shortfall.
 
-**For organisations worried about data.** Everything runs in the browser tab. Patient details, claim notes and corrections never leave the computer. For regulated industries that is often the difference between "interesting demo" and "something we can actually pilot".
+**For organisations worried about data.** Everything runs in the browser tab. Patient details, claim notes and corrections never leave the computer.
 
-**For anyone learning about agents.** Because the same loop serves four very different domains, you can see clearly which parts of an agent are general (the loop, the trace, the memory, the review step) and which parts are specific (the tools and the rules).
+**For anyone learning about agents.** Small local models make the harness visible. A large cloud model hides most of these problems; a 3B model shows every one of them, and shows that a good harness can still get useful, checked work out of it.
 
 ## Frequently asked questions
 
 **What is harness engineering?**
-Harness engineering is the practice of designing the system around an AI model: the tools it can use, the rules that check its actions, the memory it draws on, and the human review it passes through. The model provides the reasoning; the harness makes the result reliable.
+Harness engineering is the practice of designing the system around an AI model: the tools it can use, the rules that check its actions, the memory it draws on, and the human review it passes through. The model does the reasoning; the harness makes the result reliable.
 
 **How is it different from prompt engineering?**
-Prompt engineering changes what you *ask* the model. Harness engineering changes what *happens* to the model's answer. A prompt can ask the model to check for allergies; a harness checks for allergies whether the model remembered to or not.
+Prompt engineering changes what you *ask* the model. Harness engineering changes what *happens* to the model's answer. A prompt can ask the model to use the tool's fraud score; a harness checks that it did.
 
-**Do I need a GPU or an API key to try the demo?**
-No. Mock mode runs the full harness without any model. To run a real model you need a browser with WebGPU, such as a recent Chrome or Edge. No API key is ever required.
+**Can a small local model really run an agent?**
+Yes, with a good harness. In this walkthrough Llama 3.2 3B, running entirely in a browser, produced correct recommendations for the allergy, warfarin and over-limit cases, and every mistake it made was either corrected by the harness or flagged for a person.
+
+**Do I need a GPU or an API key?**
+No API key, ever. To run a real model you need a browser with WebGPU, such as a recent Chrome or Edge. Without one, Mock mode shows the full harness using scripted answers.
 
 **Does the agent really learn from corrections?**
-It remembers them. A correction is stored and pulled into the prompt the next time a similar case comes up in the same domain. The model's weights do not change, which is exactly why this is safe and easy to undo: click **Reset Memory** and it is gone.
+It remembers them. A correction is stored and added to the prompt the next time a similar case comes up in the same domain. The model's weights never change, which is why it is safe and easy to undo: click **Reset Memory** and it is gone.
 
 **Is this medical, insurance or financial advice?**
-No. All patients, claims, applicants and compounds are fictional, and the rules are simplified for illustration. The demo shows how a harness is structured, not how to treat anyone.
+No. All patients, claims, applicants and compounds are fictional, and the rules are simplified for illustration.
 
 ## Try it and read further
 
 - **Live demo:** [vishalmysore.github.io/harnessEngineeringDemo](https://vishalmysore.github.io/harnessEngineeringDemo/)
-- **Loop engineering, the companion page:** twelve techniques for keeping the agent loop reliable, each run on the same harness. [Read the article](./article_loop_engineering.md)
+- **Loop engineering, the companion page:** twelve techniques for keeping the agent loop reliable. [Read the article](./article_loop_engineering.md)
 - **The concepts in depth:** [Harness Engineering: The Infrastructure Layer That Makes AI Agents Actually Work](./article.md)
 - **How we got here:** [From Prompt Engineering to Harness Engineering](./article2.md)
 - **Source code:** [github.com/vishalmysore/harnessEngineeringDemo](https://github.com/vishalmysore/harnessEngineeringDemo)

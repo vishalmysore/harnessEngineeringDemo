@@ -5,6 +5,7 @@ const GENERIC_REQUIRED = ['summary', 'assessment', 'recommendations', 'warnings'
 export function verifyOutput(plan) {
   const errors = []
   if (plan._parse_error) errors.push('Model output was not valid JSON — fallback plan built for manual review')
+  if (plan._guardrail_violation) errors.push('Final answer still breaks a domain guardrail — see the GUARDRAIL VIOLATION warnings')
   for (const field of GENERIC_REQUIRED) {
     if (plan[field] === undefined || plan[field] === null) errors.push(`Missing field: "${field}"`)
   }

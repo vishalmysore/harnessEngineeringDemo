@@ -27,6 +27,20 @@ const MAX_REPEAT_TURNS = 2
 const FINALIZE_MSG = 'You already have the results for every tool call you just requested — they are in the tool results above. ' +
   'Do NOT call any more tools. Write your final recommendation now: output ONLY the JSON object in the required format, with no <tool_call> tags.'
 
+// A parsed reply needs at least one of these to count as an answer
+const ANSWER_FIELDS = ['summary', 'assessment', 'recommendations', 'reasoning']
+
+const MAX_GUARDRAIL_REVISIONS = 2
+
+const JSON_RETRY_MSG = 'Your last reply was not the final answer: it was not a JSON object (do not repeat tool calls or tool results). ' +
+  'Using the tool results you already have, output ONLY the JSON object in the required format now.'
+
+// Corrections keep only the start of a bad reply, so a long echo can't fill the context window
+function shortened(rawMessage, max = 300) {
+  const c = rawMessage.content || ''
+  return c.length > max ? { ...rawMessage, content: c.slice(0, max) + ' …[truncated]' } : rawMessage
+}
+
 function executeTool(domain, name, args) {
   const fn = domain.toolFns[name]
   if (!fn) throw new Error(`Unknown tool: ${name}`)
@@ -71,6 +85,9 @@ export async function runAgent(scenario, domain) {
   const completedCalls    = new Set()   // callKey of every call that ran cleanly
   const completedTools    = new Set()   // tool names that have run cleanly at least once
   let repeatTurns = 0
+  let coverageChecked = false   // one reminder about tools the model never used
+  let jsonRetried     = false   // one retry when the final answer isn't JSON
+  let guardrailRevisions = 0
   let iteration = 0
 
   tracer.publish('layer:execution', 'Starting agentic loop (Plan → Tool Call → Parse → Retry/Complete)...')
@@ -91,17 +108,46 @@ export async function runAgent(scenario, domain) {
 
     if (!toolCalls || toolCalls.length === 0) {
       const rawText = extractText(response)
+
+      const unusedTools = domain.toolSchemas.openai.map(t => t.function.name).filter(n => !completedTools.has(n))
+      if (unusedTools.length && !coverageChecked) {
+        coverageChecked = true
+        tracer.publish('layer:execution', `Model tried to finish without using ${unusedTools.join(', ')}. Asking it to call any that matter before answering.`)
+        appendCorrectionMessage(messages, shortened(getRawMessage(response)),
+          `Before you answer: you have not used ${unusedTools.join(', ')}. If any of them is relevant to this case, call it now (with all its arguments). Otherwise output ONLY the final JSON object.`)
+        continue
+      }
+
       tracer.publish('layer:execution', 'Agent completed reasoning. No further tool calls requested.')
       tracer.publish('layer:feedback', 'Running schema verification...')
 
-      const plan = extractOutput(rawText)
+      let plan = extractOutput(rawText)
 
-      const finalGuardrail = domain.validateFinalPlan(plan, toolResults)
+      // JSON that has none of the answer fields (e.g. an echoed tool result) is not an answer
+      const looksLikeAnswer = ANSWER_FIELDS.some(f => plan[f] !== undefined)
+      if (!plan._parse_error && !looksLikeAnswer) plan = extractOutput('')
+
+      if (plan._parse_error && !jsonRetried) {
+        jsonRetried = true
+        tracer.publish('layer:feedback', 'Final answer was not valid JSON. Asking the model to re-output it once.')
+        appendCorrectionMessage(messages, shortened(getRawMessage(response)), JSON_RETRY_MSG)
+        continue
+      }
+
+      // The fallback plan is already headed for manual review; domain rules only apply to real answers
+      const finalGuardrail = plan._parse_error ? { valid: true, errors: [] } : domain.validateFinalPlan(plan, toolResults)
       if (!finalGuardrail.valid) {
         tracer.publish('layer:feedback', `GUARDRAIL FINAL CHECK FAILED: ${finalGuardrail.errors.join(' | ')}`)
-        const correctionMsg = `GUARDRAIL OVERRIDE (Iteration ${iteration}):\n${finalGuardrail.errors.map(e => `- ${e}`).join('\n')}\n\nRevise and re-output corrected JSON.`
-        appendCorrectionMessage(messages, getRawMessage(response), correctionMsg)
-        continue
+        if (guardrailRevisions < MAX_GUARDRAIL_REVISIONS) {
+          guardrailRevisions++
+          const correctionMsg = `GUARDRAIL OVERRIDE (Iteration ${iteration}):\n${finalGuardrail.errors.map(e => `- ${e}`).join('\n')}\n\nRevise and re-output corrected JSON.`
+          appendCorrectionMessage(messages, shortened(getRawMessage(response), 1500), correctionMsg)
+          continue
+        }
+        // Still failing: release for manual review with the violations in front of the reviewer
+        tracer.publish('layer:feedback', `Still failing after ${MAX_GUARDRAIL_REVISIONS} revisions. Sending to manual review with the violations listed.`)
+        const warnings = Array.isArray(plan.warnings) ? plan.warnings : plan.warnings ? [plan.warnings] : []
+        plan = { ...plan, warnings: [...finalGuardrail.errors.map(e => `GUARDRAIL VIOLATION: ${e}`), ...warnings], requires_human_review: true, _guardrail_violation: true }
       }
 
       const verification = verifyOutput(plan)

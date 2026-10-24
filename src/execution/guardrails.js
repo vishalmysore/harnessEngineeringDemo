@@ -32,7 +32,7 @@ export function validateToolOutput(toolName, result) {
 
   if (toolName === 'calculateDosage') {
     if (result.cappedAtMaximum) {
-      const msg = `DOSAGE CAP APPLIED: Weight-based calc (${result.calculatedByWeight}mg) exceeds absolute max (${result.maxAbsoluteMg}mg). Capped at ${result.recommendedDose}mg.`
+      const msg = `DOSAGE CAP APPLIED: Weight-based calc (${result.calculatedByWeight}mg) exceeds absolute max (${result.maxAbsoluteDose}mg). Capped at ${result.recommendedDose}mg.`
       tracer.publish('guardrail:dosage', msg)
       return { safe: true, severity: 'INFO', warning: msg, forceRevision: false }
     }
