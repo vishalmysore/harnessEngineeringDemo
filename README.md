@@ -21,6 +21,8 @@ The three layers:
 | **3 · Feedback** | Schema verification, human-in-the-loop capture, corrections fed back into memory |
 
 📄 Read the full article: [article.md](./article.md)
+📸 Screenshot walkthrough of the live demo: [article_harness_walkthrough.md](./article_harness_walkthrough.md)
+🔁 Loop Engineering page and its article: [article_loop_engineering.md](./article_loop_engineering.md)
 
 ---
 
@@ -40,11 +42,10 @@ Each domain is a self-contained module with its own tools, scenarios, guardrails
 ## Features
 
 - **Mock AI mode** — runs the full tool-calling and guardrail loop with zero network calls; every guardrail activation is real logic, not simulated output
-- **Multi-provider LLM support** — OpenAI, Anthropic, Google Gemini, NVIDIA NIM (Nemotron Nano 12B V2)
-- **CORS proxy routing** — all API calls routed via configurable proxy using `x-target-url` header
+- **Local LLM in the browser** — WebLLM on WebGPU (Llama 3.2, Phi-3.5, Qwen 2.5, Gemma 2); no API key, no backend
 - **Human-in-the-loop** — Approve or Reject & Correct every recommendation; corrections are stored in memory and injected into future runs
 - **Live harness trace** — real-time event stream color-coded by layer (Info / Execution / Feedback / Guardrail)
-- **Persistent memory** — clinician/reviewer corrections stored in localStorage, retrieved by keyword matching
+- **Persistent memory** — clinician/reviewer corrections stored in localStorage, retrieved by keyword matching within the same domain
 
 ---
 
@@ -57,7 +58,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 — select **Mock AI** as the provider to run without an API key.
+Open http://localhost:5173 and either click **Load Model** (needs a WebGPU browser) or tick **Mock mode** to run the real tools and guardrails without a GPU.
 
 ---
 
@@ -81,7 +82,7 @@ src/
 │   ├── verification.js    # Schema validation
 │   └── tracer.js          # Pub/sub event stream
 └── utils/
-    └── llm.js             # Multi-provider LLM calls via CORS proxy
+    └── llm.js             # WebLLM wrapper with prompt-based tool calling
 ```
 
 ---
@@ -98,17 +99,17 @@ Deployment to GitHub Pages is handled automatically via `.github/workflows/deplo
 
 ---
 
-## LLM Providers
+## Local Models
 
-| Provider | Models | Key |
-|----------|--------|-----|
-| OpenAI | GPT-4o, GPT-4o Mini | `sk-…` |
-| Anthropic | Claude Opus 4.7, Sonnet 4.6 | `sk-ant-…` |
-| Google Gemini | Gemini 2.0 Flash, 1.5 Pro | `AIza…` |
-| NVIDIA NIM | Nemotron Nano 12B V2, Llama 3.1 70B | `nvapi-…` |
-| Mock AI | No key required | — |
+| Model | Download |
+|-------|----------|
+| Llama 3.2 3B (recommended) | ~2.0 GB |
+| Phi-3.5 Mini | ~2.2 GB |
+| Qwen 2.5 3B | ~2.0 GB |
+| Gemma 2 2B | ~1.5 GB |
+| Llama 3.2 1B (fast) | ~0.9 GB |
 
-API keys are stored in session memory only — never sent anywhere except the LLM provider via the CORS proxy.
+Models download once, are cached by the browser, and run on your GPU through WebGPU. Nothing leaves the tab.
 
 ---
 

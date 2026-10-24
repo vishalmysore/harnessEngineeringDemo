@@ -180,7 +180,6 @@ body.loop-page { overflow: auto; height: auto; min-height: 100%; }
   font-size: 12px;
 }
 
-.nav-link { text-decoration: none; display: inline-flex; align-items: center; }
 
 @media (max-width: 640px) {
   .tech-grid { grid-template-columns: 1fr; }

@@ -16,6 +16,8 @@ function setModelStatus(type, msg) {
   const el = document.getElementById('modelStatus')
   el.textContent = msg
   el.className   = `test-result test-result-${type}`
+  // success notices fade out; errors stay until the next load attempt
+  if (type === 'ok') setTimeout(() => { if (el.textContent === msg) el.classList.add('hidden') }, 4000)
 }
 
 async function handleLoadModel() {
@@ -81,7 +83,7 @@ function updateDomainUI() {
   })
 
   updateScenarioInfo()
-  clearTrace()
+  showTraceEmpty()
   document.getElementById('clinicianPanel').innerHTML = waitingMsg()
 }
 
@@ -97,6 +99,14 @@ function updateScenarioInfo() {
 // ── Trace panel ───────────────────────────────────────────────
 
 function clearTrace() { document.getElementById('traceContainer').innerHTML = '' }
+
+// The first call captures the "how to start" hint from index.html; later calls restore it
+let traceEmptyHtml = null
+function showTraceEmpty() {
+  const container = document.getElementById('traceContainer')
+  traceEmptyHtml ??= container.innerHTML
+  container.innerHTML = traceEmptyHtml
+}
 
 const LAYER_MAP = {
   'layer:info':        { label:'INFO LAYER',        cls:'trace-info' },

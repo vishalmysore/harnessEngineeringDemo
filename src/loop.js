@@ -67,6 +67,8 @@ function setModelStatus(type, msg) {
   const el = document.getElementById('modelStatus')
   el.textContent = msg
   el.className = `test-result test-result-${type}`
+  // success notices fade out; errors stay until the next load attempt
+  if (type === 'ok') setTimeout(() => { if (el.textContent === msg) el.classList.add('hidden') }, 4000)
 }
 
 async function handleLoadModel() {
@@ -246,8 +248,8 @@ const TECHNIQUES = [
     n: 6, name: 'Externalize State (Memory)', layer: 'info',
     domainId: 'healthcare', scenarioId: 'C',
     tagline: 'Persist human corrections outside the context window so they survive resets — and steer the next run.',
-    explain: `A prior clinician correction about Tommy’s penicillin anaphylaxis is written to <code>localStorage</code> and retrieved by keyword on the next run (<code>memoryManager.js:28</code>). Running the agent below, the trace shows <em>“Found N relevant correction(s)”</em> — real state, injected into the real system prompt. Use ↺ Reset Memory (top-right) to clear.`,
-    code: ['memoryManager.js:15 · saveCorrection', 'memoryManager.js:28 · retrieveRelevantMemories', 'orchestrator.js:23 · injected into system prompt'],
+    explain: `A prior clinician correction about Tommy’s penicillin anaphylaxis is written to <code>localStorage</code> and retrieved by keyword on the next run (<code>memoryManager.js:34</code>). Running the agent below, the trace shows <em>“Found N relevant correction(s)”</em> — real state, injected into the real system prompt. Use ↺ Reset Memory (top-right) to clear.`,
+    code: ['memoryManager.js:15 · saveCorrection', 'memoryManager.js:34 · retrieveRelevantMemories', 'orchestrator.js:23 · injected into system prompt'],
     async run(ctx, { domain, scenario }) {
       if (!modelReady(ctx)) return
       ctx.log('focus', 'Seeding a real correction into the memory store (localStorage)…')
@@ -256,7 +258,7 @@ const TECHNIQUES = [
         tags: ['pediatric', 'penicillin', 'allergy', 'amoxicillin'], scenario: scenario.id, domain: domain.id,
       })
       showMemoryCount()
-      const hits = retrieveRelevantMemories(scenarioText(scenario))
+      const hits = retrieveRelevantMemories(scenarioText(scenario), domain.id)
       ctx.log('note', `retrieveRelevantMemories() matched ${hits.length} correction(s) for this scenario — about to inject them.`)
       const res = await ctx.runAgent(domain, scenario)
       ctx.log('ok', 'The "Found N relevant correction(s)" line above is the store steering the live run — no redeploy, no fine-tune.')

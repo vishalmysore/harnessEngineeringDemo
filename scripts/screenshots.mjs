@@ -61,6 +61,9 @@ await shoot(page, '02-header', { clip: { x: 0, y: 0, width: 1400, height: 140 } 
 await page.$eval('#mockToggle', el => { if (!el.checked) el.click() })
 await sleep(200)
 
+// the fixed header would otherwise paint over the top of card close-ups
+await page.addStyleTag({ content: '.config-banner { visibility: hidden; }' })
+
 // 03 single card explainer (card #1 termination, before running)
 await (await cardHandle(page, 1)).screenshot({ path: resolve(OUT, '03-card-explainer.png') })
 console.log('  ✓ 03-card-explainer')

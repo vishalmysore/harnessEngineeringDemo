@@ -57,7 +57,7 @@ The four domains carry the twelve techniques between them, so the page doubles a
 
 **05 · Context compaction & pruning.** The context window is finite working memory. After a real drug-discovery run, the raw tool payloads (compound profile, full toxicology panel, regulatory dossier) are bulky; compaction folds the stale ones into one-line summaries — the same message plumbing as `appendToolResults()` (`llm.js:177`) — and the card prints the real before/after character counts.
 
-**06 · Externalize state (memory).** State that must survive a context reset lives in a store, not a transcript. A clinician correction about a child's penicillin anaphylaxis is written to `localStorage` via `saveCorrection()` and retrieved by keyword on the next run (`memoryManager.js:28`). Run the card and the live trace shows the orchestrator reporting **"Found 1 relevant correction(s)"** — real state, injected into the real system prompt before the model runs.
+**06 · Externalize state (memory).** State that must survive a context reset lives in a store, not a transcript. A clinician correction about a child's penicillin anaphylaxis is written to `localStorage` via `saveCorrection()` and retrieved by keyword on the next run (`memoryManager.js:34`). Run the card and the live trace shows the orchestrator reporting **"Found 1 relevant correction(s)"** — real state, injected into the real system prompt before the model runs.
 
 ![Memory technique running](./docs/screenshots/05-memory-run.png)
 

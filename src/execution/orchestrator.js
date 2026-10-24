@@ -8,6 +8,13 @@ import {
 
 const MAX_ITERATIONS = 10
 
+// Small models sometimes repeat a tool call with empty args — catch it before the tool runs
+function missingRequiredArgs(domain, name, args) {
+  const schema = domain.toolSchemas.openai.find(t => t.function.name === name)
+  const required = schema?.function.parameters?.required || []
+  return required.filter(p => args?.[p] === undefined || args[p] === '')
+}
+
 function executeTool(domain, name, args) {
   const fn = domain.toolFns[name]
   if (!fn) throw new Error(`Unknown tool: ${name}`)
@@ -20,7 +27,7 @@ export async function runAgent(scenario, domain) {
   tracer.publish('layer:info', `Domain: ${domain.name} | Scenario: ${scenario.title}`)
 
   const queryText = Object.values(scenario).filter(v => typeof v === 'string').join(' ')
-  const memories  = retrieveRelevantMemories(queryText)
+  const memories  = retrieveRelevantMemories(queryText, domain.id)
   tracer.publish('layer:info',
     memories.length > 0
       ? `Searching past feedback logs... Found ${memories.length} relevant correction(s).`
@@ -96,7 +103,10 @@ export async function runAgent(scenario, domain) {
       const { id, name, args } = tc
       tracer.publish('layer:execution', `Invoking ${name}(${JSON.stringify(args)})...`)
 
-      const guardCall = domain.validateToolCall(name, args)
+      const missing = missingRequiredArgs(domain, name, args)
+      const guardCall = missing.length
+        ? { safe: false, reason: `${name} needs ${missing.join(', ')} — call it again with those arguments filled in.` }
+        : domain.validateToolCall(name, args)
       if (!guardCall.safe) {
         tracer.publish('layer:feedback', `GUARDRAIL BLOCKED tool call: ${guardCall.reason}`)
         const blockedResult = { error: `Guardrail blocked: ${guardCall.reason}` }
@@ -117,6 +127,8 @@ export async function runAgent(scenario, domain) {
         guardrailWarnings.push(outputCheck.warning)
         result._guardrail = { severity: outputCheck.severity, warning: outputCheck.warning }
         if (outputCheck.forceRevision) result._guardrail.instruction = 'This result requires you to revise your recommendation.'
+      } else if (result?.error) {
+        tracer.publish('layer:execution', `Tool ${name} returned an error: ${result.error}`)
       } else {
         tracer.publish('layer:execution', `Tool ${name} returned OK.`)
       }

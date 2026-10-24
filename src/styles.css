@@ -75,7 +75,22 @@ html, body {
 
 .banner-center {
   flex: 1;
-  overflow: hidden;
+  min-width: 0;
+  position: relative;
+}
+
+/* Progress and status float just under the fixed 64px banner instead of growing it */
+.banner-center > .model-progress,
+.banner-center > .test-result {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  max-width: 560px;
+  padding: 6px 12px;
+  background: var(--surface);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  z-index: 101;
 }
 
 .config-row {
@@ -144,11 +159,13 @@ html, body {
 
 .banner-right {
   flex: 0 0 auto;
+  margin-left: auto;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
 }
+
+.nav-link { text-decoration: none; display: inline-flex; align-items: center; white-space: nowrap; }
 
 .memory-badge {
   font-size: 11px;
