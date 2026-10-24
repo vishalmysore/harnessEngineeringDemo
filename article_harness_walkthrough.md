@@ -162,17 +162,20 @@ I tested this on an ordinary laptop with an Intel integrated GPU, which is about
 
 **When the model behaves.** On its first pass through the penicillin case, Llama 3.2 3B did exactly what you want. It fetched the patient record, the allergy alert fired, it checked amoxicillin against penicillin, and the cross-allergy guardrail stepped in with "contraindicated, use azithromycin instead." That is the same chain of events as the walkthrough above, driven by a real model running on the laptop.
 
-**When the model does not.** Small models wander. In later iterations the same model kept repeating its tool calls with the arguments left empty. The harness now refuses those calls before they run and tells the model which argument is missing, so the model gets a clear signal instead of a vague error.
+**When the model does not.** Small models wander. Two habits showed up again and again on this laptop:
 
-On another run the standard build of the model produced pure noise. This happens with half-precision (f16) model builds on some integrated graphics chips: the numbers overflow and the text comes out scrambled. That is why the model list also offers **Llama 3.2 3B f32**, a full-precision build for Intel and other integrated GPUs. It is a bigger download (about 2.9 GB), but its output stays readable.
+- **Asking again for what it already has.** After getting its tool results, the model would request the very same tools again, sometimes with the arguments left empty. Left alone, it kept looping until the conversation no longer fit in its 4,096-token memory.
+- **Scrambled text.** The standard half-precision (f16) build of the model sometimes produced pure noise. This happens on some integrated graphics chips, where the numbers overflow. That is why the model list also offers **Llama 3.2 3B f32**, a full-precision build for Intel and other integrated GPUs. It is a bigger download (about 2.9 GB), but its output stays readable.
 
-Here is a run on the f32 build:
+The first habit is a harness problem, so the harness fixes it. It remembers every tool call that has already run. When the model asks for the same thing again, the harness skips the call and tells the model plainly: you already have these results, write your final answer now. If the model ignores that twice in a row, the harness stops the run and sends the case for manual review instead of letting it spin.
 
-![Real Llama 3.2 3B f32 run: correct tool calls, guardrails firing, empty tool calls blocked, and the run stopped when the context window filled up](./docs/screenshots/harness/16-real-model-run.png)
+Here is the full penicillin case on the f32 build, running for real on the laptop:
 
-The model looks up the patient, the allergy alert fires, and the cross-allergy guardrail blocks amoxicillin. On the next turn it repeats the same calls with the arguments left empty, and the harness blocks each one and names the missing argument. It recovers and calls the tools properly again, and then again. It never moves on to writing its answer, and every repeat adds more tool results to the conversation. Eventually the conversation no longer fits in the model's 4,096-token memory, and the run stops.
+![Real Llama 3.2 3B f32 run: tool calls, allergy and cross-allergy guardrails, a repeat call skipped, and a valid azithromycin recommendation on the clinician review desk](./docs/screenshots/harness/16-real-model-run.png)
 
-Look at what reached the review desk: a clear error, not a recommendation. In other runs, where the model finished with text that was not valid JSON, the Feedback layer flagged it and the case went to the clinician marked **Manual review required**. Either way, nothing unsafe reached the review desk looking like a real answer.
+The model looks up the patient, the allergy alert fires, and the cross-allergy guardrail blocks amoxicillin. On its next turn it asks for the same three tools again. The harness skips them and asks for the final answer, and this time the model writes it: a proper recommendation of a macrolide antibiotic such as azithromycin, with the allergy explained. It passes the format check and lands on the clinician's desk for sign-off. The whole run took about seven minutes on integrated graphics.
+
+When a run does fail, the harness makes the failure visible. Output that is not valid JSON is flagged by the Feedback layer and goes to the clinician marked **Manual review required**. Nothing unsafe reaches the review desk looking like a real answer.
 
 That is the honest lesson of running agents on small local models: the model will sometimes fail, and the harness is what turns a silent failure into a visible one. On a stronger GPU, or with the larger models in the list, runs are faster and far more reliable. The safety behaviour stays the same either way, because it lives in the harness, not in the model.
 

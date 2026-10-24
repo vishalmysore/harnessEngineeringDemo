@@ -15,6 +15,18 @@ function missingRequiredArgs(domain, name, args) {
   return required.filter(p => args?.[p] === undefined || args[p] === '')
 }
 
+// Same tool + same args (key order ignored) = same call
+function callKey(name, args) {
+  const sorted = Object.keys(args || {}).sort().map(k => [k, args[k]])
+  return `${name}:${JSON.stringify(sorted)}`
+}
+
+// After two turns of nothing but repeats, stop instead of filling the context window
+const MAX_REPEAT_TURNS = 2
+
+const FINALIZE_MSG = 'You already have the results for every tool call you just requested — they are in the tool results above. ' +
+  'Do NOT call any more tools. Write your final recommendation now: output ONLY the JSON object in the required format, with no <tool_call> tags.'
+
 function executeTool(domain, name, args) {
   const fn = domain.toolFns[name]
   if (!fn) throw new Error(`Unknown tool: ${name}`)
@@ -56,6 +68,9 @@ export async function runAgent(scenario, domain) {
   const messages = [{ role: 'user', content: `${scenarioText}\n\nAnalyse thoroughly using all available tools, then generate your structured recommendation.` }]
   const toolResults       = []
   const guardrailWarnings = []
+  const completedCalls    = new Set()   // callKey of every call that ran cleanly
+  const completedTools    = new Set()   // tool names that have run cleanly at least once
+  let repeatTurns = 0
   let iteration = 0
 
   tracer.publish('layer:execution', 'Starting agentic loop (Plan → Tool Call → Parse → Retry/Complete)...')
@@ -97,10 +112,44 @@ export async function runAgent(scenario, domain) {
       return { plan, toolResults, guardrailWarnings, verification, rawText }
     }
 
+    // ── Repeat detection: calls already answered (or empty re-asks of a tool that already ran) ──
+    const isRepeat = ({ name, args }) =>
+      completedCalls.has(callKey(name, args)) ||
+      (completedTools.has(name) && missingRequiredArgs(domain, name, args).length > 0)
+    const repeats = toolCalls.filter(isRepeat)
+
+    if (repeats.length === toolCalls.length) {
+      repeatTurns++
+      const names = [...new Set(repeats.map(tc => tc.name))].join(', ')
+
+      if (repeatTurns >= MAX_REPEAT_TURNS) {
+        tracer.publish('layer:feedback', `Model kept re-requesting tools it already has results for (${names}). Stopping the loop and sending the case for manual review.`)
+        const plan = extractOutput(extractText(response))
+        const verification = verifyOutput(plan)
+        tracer.publish('layer:feedback', verification.valid ? 'Schema verification PASSED. Audit complete.' : `Schema issues: ${verification.errors.join('; ')}`)
+        tracer.publish('agent:complete', plan)
+        return { plan, toolResults, guardrailWarnings, verification, rawText: response.text }
+      }
+
+      tracer.publish('layer:execution', `Repeat tool calls skipped (${names}) — results already available. Asking the model for its final answer.`)
+      appendCorrectionMessage(messages, getRawMessage(response), FINALIZE_MSG)
+      continue
+    }
+    repeatTurns = 0
+
     const processedResults = []
 
     for (const tc of toolCalls) {
       const { id, name, args } = tc
+
+      // Mixed turn: answer repeats with a pointer instead of running them again
+      if (isRepeat(tc)) {
+        tracer.publish('layer:execution', `Skipping repeat call ${name}(${JSON.stringify(args)}) — result already available.`)
+        const note = { note: `${name} was already called; use the earlier result above.` }
+        processedResults.push({ id, name, result: note, formatted: formatToolResult(id, name, note) })
+        continue
+      }
+
       tracer.publish('layer:execution', `Invoking ${name}(${JSON.stringify(args)})...`)
 
       const missing = missingRequiredArgs(domain, name, args)
@@ -131,6 +180,11 @@ export async function runAgent(scenario, domain) {
         tracer.publish('layer:execution', `Tool ${name} returned an error: ${result.error}`)
       } else {
         tracer.publish('layer:execution', `Tool ${name} returned OK.`)
+      }
+
+      if (!result?.error) {
+        completedCalls.add(callKey(name, args))
+        completedTools.add(name)
       }
 
       toolResults.push({ name, args, result })
