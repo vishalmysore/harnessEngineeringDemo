@@ -32,9 +32,15 @@ self.onmessage = async (e) => {
     }
 
     try {
-      const adapter = await navigator.gpu?.requestAdapter()
+      // Two different failures: the browser has no WebGPU at all, or it has WebGPU
+      // but won't hand out a GPU (acceleration off, GPU/driver blocklisted)
+      if (!navigator.gpu) {
+        post({ status: 'error', error: 'This browser does not support WebGPU. Use a recent Chrome or Edge on desktop, or tick Mock mode to try the demo without a model.' })
+        return
+      }
+      const adapter = await navigator.gpu.requestAdapter()
       if (!adapter) {
-        post({ status: 'error', error: 'WebGPU not available. Use Chrome 113+ on a machine with a GPU.' })
+        post({ status: 'error', error: 'WebGPU is supported, but the browser would not give this page a GPU. Turn on "Use graphics acceleration when available" in browser settings and restart, and check chrome://gpu shows WebGPU as hardware accelerated (some GPU drivers are blocked). Or tick Mock mode to try the demo without a model.' })
         return
       }
       post({ status: 'device_detected', device: 'webgpu' })

@@ -97,8 +97,9 @@ html, body {
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;   /* wrapping would spill out of the fixed 64px banner */
 }
+.config-row .btn, .mock-toggle-label span { white-space: nowrap; }
 
 .config-field {
   display: flex;
@@ -648,3 +649,20 @@ html, body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Narrower windows: drop secondary text so the banner stays one 64px row ── */
+@media (max-width: 1250px) {
+  .app-sub, .key-note { display: none; }
+  #modelSelect { max-width: 230px; }
+}
+@media (max-width: 1050px) {
+  .memory-badge { display: none; }
+  .banner-right .btn { padding: 6px 10px; font-size: 12px; }
+  #modelSelect { max-width: 190px; }
+  .config-banner { gap: 10px; padding: 0 10px; }
+}
+@media (max-width: 900px) {
+  .app-logo > div { display: none; }   /* the logo icon stays; the dropdown needs the room */
+  .mock-toggle-label span { font-size: 10px; }
+  #modelSelect { max-width: 210px; }
+}

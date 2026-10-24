@@ -112,6 +112,22 @@ Deployment to GitHub Pages is handled automatically via `.github/workflows/deplo
 
 Models download once, are cached by the browser, and run on your GPU through WebGPU. Nothing leaves the tab.
 
+**"WebGPU is supported, but the browser would not give this page a GPU"?** Turn on *Use graphics acceleration when available* in your browser settings and restart, then check that `chrome://gpu` lists WebGPU as hardware accelerated (some GPU drivers are blocked). Mock mode works on any machine.
+
+---
+
+## Credits
+
+- The three-layer harness architecture (Information · Execution · Feedback) follows **Etna Labs**.
+- In-browser inference by [WebLLM](https://github.com/mlc-ai/web-llm) (MLC AI) with Meta's Llama 3.2 and other open models.
+- Research references are listed in [article.md](./article.md#references).
+
+---
+
+## Disclaimer
+
+This is an educational demo, provided as is with no warranty. All patients, claims, policies, applicants, compounds, scores and thresholds are **fictional** and simplified. Nothing here is medical, pharmaceutical, insurance, financial, legal, career or regulatory advice, and it must not be used to make real decisions. AI output can be wrong, and the guardrails catch some errors but not all. This is an independent personal project; names of companies, labs, frameworks and models are used only for credit or description and do not imply endorsement or affiliation.
+
 ---
 
 ## Related

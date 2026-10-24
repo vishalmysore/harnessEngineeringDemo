@@ -12,6 +12,8 @@ It is easy to agree with that idea in the abstract and much harder to picture it
 
 **Try it yourself:** [vishalmysore.github.io/harnessEngineeringDemo](https://vishalmysore.github.io/harnessEngineeringDemo/)
 
+> **Disclaimer:** This is an educational demo. Every patient, claim, applicant and compound is fictional, the rules are simplified, and the AI's output is shown as-is, mistakes included. Nothing here is medical, insurance, financial, career or regulatory advice. See the [full disclaimer](#disclaimer) at the end.
+
 ---
 
 ## The problem: a good model is not a safe agent
@@ -28,7 +30,7 @@ You do not fix these by writing a longer prompt. You fix them by building checks
 
 ## The solution: three layers around the model
 
-The demo organises the harness into three layers:
+The demo organises the harness into three layers, following the three-layer agent harness architecture (Information, Execution, Feedback) from **Etna Labs**:
 
 | Layer | What it does | In the demo |
 |-------|--------------|-------------|
@@ -203,13 +205,29 @@ Prompt engineering changes what you *ask* the model. Harness engineering changes
 Yes, with a good harness. In this walkthrough Llama 3.2 3B, running entirely in a browser, produced correct recommendations for the allergy, warfarin and over-limit cases, and every mistake it made was either corrected by the harness or flagged for a person.
 
 **Do I need a GPU or an API key?**
-No API key, ever. To run a real model you need a browser with WebGPU, such as a recent Chrome or Edge. Without one, Mock mode shows the full harness using scripted answers.
+No API key, ever. To run a real model you need a browser with WebGPU, such as a recent Chrome or Edge. Without one, Mock mode shows the full harness using scripted answers. If the page says the browser would not give it a GPU, turn on "Use graphics acceleration when available" in the browser settings, restart, and check that `chrome://gpu` lists WebGPU as hardware accelerated.
 
 **Does the agent really learn from corrections?**
 It remembers them. A correction is stored and added to the prompt the next time a similar case comes up in the same domain. The model's weights never change, which is why it is safe and easy to undo: click **Reset Memory** and it is gone.
 
 **Is this medical, insurance or financial advice?**
-No. All patients, claims, applicants and compounds are fictional, and the rules are simplified for illustration.
+No. All patients, claims, applicants and compounds are fictional, and the rules are simplified for illustration. See the disclaimer below.
+
+## Credits
+
+- **Three-layer harness architecture:** the Information, Execution and Feedback layers used throughout this demo follow the agent harness architecture from **Etna Labs**.
+- **Research on harness engineering:** He (2026), Meng (2026), Lee (2026) and Banu (2026). Full references are in [the companion article](./article.md#references).
+- **Running models in the browser:** [WebLLM](https://github.com/mlc-ai/web-llm) by the MLC AI team, with Meta's Llama 3.2 models.
+
+## Disclaimer
+
+This project is an educational demonstration of harness engineering and is provided as is, with no warranty of any kind.
+
+- **Fictional data.** Every patient, claim, policy, applicant, compound, score and threshold in the demo is made up for illustration. Any resemblance to real people or cases is coincidental.
+- **Not professional advice.** Nothing in the demo, its screenshots or this article is medical, pharmaceutical, insurance, financial, legal, career or regulatory advice. Do not use it to make real decisions about treatment, claims, employment or drug development. Always consult a qualified professional.
+- **AI output can be wrong.** The screenshots show a small language model's real output, including its mistakes. The guardrails and checks are simplified examples. They catch some errors, but not all of them, as the insurance walkthrough shows.
+- **Not production software.** The rules, thresholds and drug interaction data are not complete or clinically validated. A real system in any of these fields needs domain experts, validated data, regulatory review and human oversight.
+- **Independent work.** This is a personal project. Names of companies, labs, frameworks and models are used only to credit or describe them, and do not imply endorsement by or affiliation with them.
 
 ## Try it and read further
 
