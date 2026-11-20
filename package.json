@@ -11,6 +11,8 @@
     "vite": "^5.4.0"
   },
   "dependencies": {
-    "@mlc-ai/web-llm": "^0.2.84"
+    "@mlc-ai/web-llm": "^0.2.84",
+    "cytoscape": "^3.34.3",
+    "cytoscape-dagre": "^4.0.1"
   }
 }

@@ -19,6 +19,8 @@ export default defineConfig(({ command }) => ({
         main: fileURLToPath(new URL('./src/index.html', import.meta.url)),
         // New loop-engineering demo — additive sibling page.
         loop: fileURLToPath(new URL('./src/loop.html', import.meta.url)),
+        // Agent Patterns Lab — 12 architectures live on WebLLM, additive sibling page.
+        patterns: fileURLToPath(new URL('./src/patterns.html', import.meta.url)),
       },
     },
   },

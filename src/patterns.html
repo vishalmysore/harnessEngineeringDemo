@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Patterns Lab — 12 architectures, live on your GPU</title>
+  <meta name="description" content="Run 12 AI agent architecture patterns — ReAct, routing, voting, orchestrator-workers, swarm, human-in-the-loop and more — live in your browser on a real WebLLM model." />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./patterns.css" />
+</head>
+<body class="patterns-page">
+  <header class="config-banner">
+    <div class="banner-left">
+      <div class="app-logo">
+        <span class="logo-icon">🧩</span>
+        <div>
+          <div class="app-title">Agent Patterns Lab</div>
+          <div class="app-sub">12 agent architectures · real WebLLM model · real domain tools</div>
+        </div>
+      </div>
+    </div>
+    <div class="banner-center">
+      <div class="config-row">
+        <div class="config-field">
+          <label>Local Model <span class="key-note">(runs on your GPU — no API key, nothing leaves the tab)</span></label>
+          <select id="modelSelect"></select>
+        </div>
+        <div class="config-field test-field">
+          <label>&nbsp;</label>
+          <button id="loadModelBtn" class="btn btn-test">⬇ Load Model</button>
+        </div>
+      </div>
+      <div id="modelProgress" class="model-progress hidden">
+        <div class="model-progress-bar-wrap"><div id="modelProgressFill" class="model-progress-fill"></div></div>
+        <div id="modelProgressLabel" class="model-progress-label">Loading…</div>
+      </div>
+      <div id="modelStatus" class="test-result hidden"></div>
+    </div>
+    <div class="banner-right">
+      <a href="./index.html" class="btn btn-reset nav-link">⚙ Harness</a>
+      <a href="./loop.html" class="btn btn-reset nav-link">🔁 Loops</a>
+    </div>
+  </header>
+
+  <main class="pl-main">
+    <section class="pl-intro">
+      <h1>Agent architecture patterns — <span class="accent">live</span>, not diagrams</h1>
+      <p>
+        From a single augmented LLM to swarms and human approval gates: pick a pattern, press <b>Run</b>, and watch the
+        flow light up as a <b>real model</b> in your browser makes each decision. Every pattern runs on a real use-case
+        from the harness domains, calls the same real tools, and records what it cost — calls, tokens, seconds — in the
+        selection matrix at the bottom.
+      </p>
+      <p id="gpuNote" class="pl-note">Load a model above to start. Small models (1–3B) are used on purpose: they make the
+        trade-offs between patterns easy to see.</p>
+    </section>
+
+    <div class="pl-layout">
+      <nav class="pl-nav" id="patternNav"><!-- pattern list --></nav>
+
+      <section class="pl-stage">
+        <div class="pl-head">
+          <div>
+            <div class="pl-group" id="pGroup"></div>
+            <h2 id="pName"></h2>
+            <div class="pl-badges" id="pBadges"></div>
+          </div>
+          <div class="pl-actions">
+            <button id="runBtn" class="btn btn-execute">▶ Run pattern</button>
+            <button id="stopBtn" class="btn btn-reset" disabled>■ Stop</button>
+          </div>
+        </div>
+        <div class="pl-usecase" id="pUsecase"></div>
+        <p class="pl-explain" id="pExplain"></p>
+        <div class="pl-input hidden" id="pInput">
+          <label id="pInputLabel"></label>
+          <div class="pl-input-row">
+            <select id="pInputSample"></select>
+          </div>
+          <textarea id="pInputText" rows="2"></textarea>
+        </div>
+
+        <div class="pl-graph-wrap">
+          <div id="graph" class="pl-graph"></div>
+          <div class="pl-legend">
+            <span class="lg lg-llm">model call</span><span class="lg lg-tool">tool / data</span><span class="lg lg-gate">gate</span>
+            <span class="lg lg-rule">rules</span><span class="lg lg-human">human</span><span class="lg lg-agent">agent</span>
+          </div>
+        </div>
+
+        <div id="controls" class="pl-controls hidden"></div>
+        <div id="result" class="pattern-result hidden"></div>
+        <div id="runStats" class="pl-stats"></div>
+      </section>
+
+      <aside class="pl-trace-panel">
+        <div class="pl-trace-head">Live trace <span class="pl-trace-sub">every model call, tool call and gate</span></div>
+        <div id="trace" class="trace-container pl-trace"><div class="trace-empty-sub">Run a pattern to stream its trace.</div></div>
+      </aside>
+    </div>
+
+    <section class="pl-matrix">
+      <div class="pl-matrix-head">
+        <h2>Selection matrix — measured on <span id="matrixModel">your model</span></h2>
+        <button id="clearMatrixBtn" class="btn btn-reset">↺ Clear results</button>
+      </div>
+      <p class="pl-note">The first four columns are the usual guidance. The last four are filled in by your own runs.</p>
+      <div class="pl-table-wrap"><table id="matrix"></table></div>
+    </section>
+
+    <footer class="loop-footer">
+      <p>Everything runs client-side via WebLLM + WebGPU. Patterns: <code>src/patterns/catalog.js</code> · runtime: <code>src/patterns/runtime.js</code> ·
+        graph adapted from <a href="https://github.com/vishalmysore/layaForWorkflows">layaForWorkflows</a> · tools, memory, guardrails and the ReAct orchestrator are the harness's own modules.</p>
+    </footer>
+  </main>
+
+  <script type="module" src="./patterns/main.js"></script>
+</body>
+</html>

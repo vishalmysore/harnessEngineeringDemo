@@ -19,6 +19,10 @@ let _genCounter  = 0
 let _onProgress  = null
 let _pendingLoad = null
 let _pendingGen  = null
+const _genListeners = new Set()
+
+/** Subscribe to every completed generation (latency + token usage). Returns an unsubscribe fn. */
+export function onGeneration(cb) { _genListeners.add(cb); return () => _genListeners.delete(cb) }
 
 function _ensureWorker() {
   if (_worker) return
@@ -55,7 +59,8 @@ function _handleMessage(e) {
       _onProgress?.({ type: 'device' })
       break
     case 'success':
-      _pendingGen?.resolve({ text: msg.generatedText, latencyMs: msg.elapsedMs, tokensPerSec: msg.tokensPerSec })
+      _genListeners.forEach(cb => { try { cb({ latencyMs: msg.elapsedMs, tokensPerSec: msg.tokensPerSec, usage: msg.usage }) } catch (_) {} })
+      _pendingGen?.resolve({ text: msg.generatedText, latencyMs: msg.elapsedMs, tokensPerSec: msg.tokensPerSec, usage: msg.usage })
       _pendingGen = null
       break
     case 'cancelled':
@@ -137,7 +142,7 @@ function _parseToolCalls(text) {
 
 // ── Public API (mirrors old cloud llm.js surface) ──────────────
 
-export async function callLLMWithTools(messages, systemPrompt, toolSchemasOpenAI /*, _anthropic unused */) {
+export async function callLLMWithTools(messages, systemPrompt, toolSchemasOpenAI, _anthropicUnused, options) {
   if (_status !== 'ready') throw new Error('No model loaded. Use the model loader to load a model first.')
 
   const fullSystemPrompt = systemPrompt + _buildToolPromptSuffix(toolSchemasOpenAI)
@@ -146,11 +151,11 @@ export async function callLLMWithTools(messages, systemPrompt, toolSchemasOpenAI
 
   return new Promise((resolve, reject) => {
     _pendingGen = {
-      resolve: ({ text, latencyMs, tokensPerSec }) =>
-        resolve({ _webllm: true, text, latencyMs, tokensPerSec }),
+      resolve: ({ text, latencyMs, tokensPerSec, usage }) =>
+        resolve({ _webllm: true, text, latencyMs, tokensPerSec, usage }),
       reject,
     }
-    _worker.postMessage({ action: 'generate', messages, systemPrompt: fullSystemPrompt, gen })
+    _worker.postMessage({ action: 'generate', messages, systemPrompt: fullSystemPrompt, gen, options })
   })
 }
 

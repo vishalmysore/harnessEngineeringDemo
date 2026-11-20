@@ -18,7 +18,7 @@ async function disposeCurrent() {
 }
 
 self.onmessage = async (e) => {
-  const { action, modelId, messages, systemPrompt, gen } = e.data
+  const { action, modelId, messages, systemPrompt, gen, options } = e.data
 
   if (action === 'load') {
     loadAborted = false
@@ -91,8 +91,10 @@ self.onmessage = async (e) => {
           { role: 'system', content: systemPrompt },
           ...messages,
         ],
-        max_tokens:         2048,
-        temperature:        0.1,
+        // per-call options (patterns page: voting temperatures, short worker replies);
+        // defaults unchanged for the harness + loop pages
+        max_tokens:         options?.max_tokens  ?? 2048,
+        temperature:        options?.temperature ?? 0.1,
         repetition_penalty: 1.1,
       })
       const elapsed   = performance.now() - t0
@@ -103,6 +105,7 @@ self.onmessage = async (e) => {
         elapsedMs:     elapsed,
         tokensPerSec:  (reply.usage?.completion_tokens ?? generated.trim().split(/\s+/).length) / (elapsed / 1000),
         modelId:       currentModelId,
+        usage:         reply.usage ? { prompt_tokens: reply.usage.prompt_tokens, completion_tokens: reply.usage.completion_tokens } : null,
       })
     } catch (err) {
       post({ status: 'error', error: err?.message ?? String(err) })
